@@ -6,8 +6,8 @@ version: 2
 # Cada teste vira uma consulta SQL que procura VIOLAÇÕES. Se ela
 # retorna alguma linha, o teste falha.
 #
-# Exemplo: o teste `not_null` em processo_id compila para
-#     select processo_id from stg_processos where processo_id is null
+# Exemplo: o teste `not_null` em chamado_id compila para
+#     select chamado_id from stg_chamados where chamado_id is null
 # Nada de mágico — dá para ver o SQL gerado em dbt/target/compiled/.
 #
 # ⚠ Diferença importante:
@@ -16,54 +16,54 @@ version: 2
 # =====================================================================
 
 models:
-  - name: stg_processos
+  - name: stg_chamados
     description: >
-      Processos tipados, deduplicados e com datas normalizadas.
+      Chamados tipados, deduplicados e com datas normalizadas.
       É a base de tudo: se algo estiver errado aqui, contamina a Gold.
     columns:
-      - name: processo_id
-        description: Identificador único do processo (chave natural).
+      - name: chamado_id
+        description: Identificador único do chamado (chave natural).
         tests:
           - not_null   # o registro sem id foi filtrado no modelo
           - unique     # as duplicatas integrais foram removidas
-      - name: data_distribuicao
-        description: Data em que o processo foi distribuído.
+      - name: data_abertura
+        description: Data em que o chamado foi aberto.
         tests:
           - not_null   # passa graças ao tratamento dos dois formatos de data
       - name: situacao
-        description: Situação do processo na origem.
+        description: Situação do chamado na origem.
         tests:
           # accepted_values garante que a origem não invente valores novos.
-          # Se amanhã aparecer "Suspenso", o teste falha e nós ficamos
-          # sabendo — em vez de descobrir por um relatório errado.
+          # Se amanhã aparecer "Aguardando usuário", o teste falha e nós
+          # ficamos sabendo — em vez de descobrir por um relatório errado.
           - accepted_values:
               arguments:
-                values: ['Baixado', 'Em andamento']
+                values: ['Resolvido', 'Em andamento']
 
-  - name: stg_comarcas
-    description: Cadastro de comarcas com nomes padronizados.
+  - name: stg_unidades
+    description: Cadastro de unidades com nomes padronizados.
     columns:
-      - name: comarca_id
+      - name: unidade_id
         tests:
           - not_null
           - unique
 
-  - name: stg_classes
-    description: Classes processuais deduplicadas (um registro por classe_id).
+  - name: stg_categorias
+    description: Categorias de chamado deduplicadas (um registro por categoria_id).
     columns:
-      - name: classe_id
+      - name: categoria_id
         tests:
           - not_null
           # este `unique` é a prova de que a deduplicação funcionou:
           # sem o row_number() do modelo, ele falharia
           - unique
 
-  - name: stg_movimentacoes
-    description: Eventos de movimentação processual, deduplicados.
+  - name: stg_interacoes
+    description: Eventos ocorridos dentro dos chamados, deduplicados.
     columns:
-      - name: processo_id
+      - name: chamado_id
         tests:
           - not_null
-      - name: data_movimento
+      - name: data_interacao
         tests:
           - not_null

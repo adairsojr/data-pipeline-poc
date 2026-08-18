@@ -8,13 +8,15 @@ Na aula anterior, estudamos conceitualmente a jornada `Fonte → Ingestão → A
 
 ## A pergunta de negócio
 
-> **Qual é o tempo médio de tramitação por comarca, classe e período?**
+> **Qual é o tempo médio de atendimento por unidade, categoria e período?**
 
 Uma pergunta simples de enunciar. Todo o projeto existe para respondê-la de forma **confiável e reproduzível** — e responder assim exige a jornada inteira.
 
 ## O problema
 
-Os dados de que precisamos estão espalhados em fontes diferentes de um Tribunal de Justiça fictício — CSVs e JSON, como se tivessem sido exportados de sistemas distintos — e **contêm problemas reais de qualidade**: datas em formatos misturados, registros duplicados, identificadores órfãos, grafias inconsistentes. Nada aqui está perfeito de propósito.
+Os dados de que precisamos estão espalhados em fontes diferentes da Central de Serviços de uma instituição fictícia — CSVs e JSON, como se tivessem sido exportados de sistemas distintos — e **contêm problemas reais de qualidade**: datas em formatos misturados, registros duplicados, identificadores órfãos, grafias inconsistentes. Nada aqui está perfeito de propósito.
+
+O cenário: uma central de atendimento com oito unidades, que registra chamados de suporte (acesso e senha, rede, equipamento, sistema acadêmico, e-mail, impressão). Cada chamado tem uma data de abertura e, se já foi resolvido, uma data de fechamento. **O tempo de atendimento não existe em fonte nenhuma** — é preciso derivá-lo.
 
 ## Arquitetura
 
@@ -101,7 +103,7 @@ data-pipeline-poc/
 │       ├── sources.yml   #   declara o Bronze como fonte (source) do dbt
 │       ├── silver/       #   stg_*: tipagem, limpeza, padronização (1 .sql por tabela)
 │       │   └── schema.yml#   testes de qualidade da Silver
-│       └── gold/         #   fato_processo + dimensões (modelo analítico)
+│       └── gold/         #   fato_chamado + dimensões (modelo analítico)
 │           └── schema.yml#   testes de qualidade da Gold
 │
 ├── notebooks/
@@ -109,7 +111,7 @@ data-pipeline-poc/
 ├── consultas/
 │   └── analise.sql       # o consumo: 5 consultas comentadas (+ 2 armadilhas)
 ├── scripts/
-│   └── criar_esaj_simulado.py   # monta um OLTP normalizado p/ comparação
+│   └── criar_oltp_simulado.py   # monta um OLTP normalizado p/ comparação
 ├── tests/                # pytest: testa o CÓDIGO da ingestão
 └── docs/
     ├── architecture.md              # camadas, decisões e as 5 etapas do dbt run
@@ -130,10 +132,10 @@ data-pipeline-poc/
 | Bronze preserva — inclusive os defeitos | `data/bronze/` × modelos `stg_*` |
 | Qualidade de dados como código | `dbt/models/*/schema.yml` |
 | `source()` × `ref()` e a DAG | `sources.yml` + qualquer modelo Gold |
-| Grão, medida e dimensão | `fato_processo.sql` |
-| Dimensão degenerada, conformada e role-playing | `fato_processo.sql`, `dim_comarca.sql`, `dim_tempo.sql` |
+| Grão, medida e dimensão | `fato_chamado.sql` |
+| Dimensão degenerada, conformada e role-playing | `fato_chamado.sql`, `dim_unidade.sql`, `dim_tempo.sql` |
 | Integridade sem chave estrangeira | teste `relationships` em `gold/schema.yml` |
-| O que a governança decide (e o SQL não) | `stg_classes.sql` |
+| O que a governança decide (e o SQL não) | `stg_categorias.sql` |
 | Storage × engine | `external_location` em `sources.yml` |
 | A mesma pergunta no OLTP × na Gold | `docs/comparacao-oltp-vs-gold.md` |
 
@@ -141,15 +143,15 @@ A consulta que fecha a jornada:
 
 ```sql
 select
-    c.nome_comarca,
-    cl.nome_classe,
+    c.nome_unidade,
+    cl.nome_categoria,
     t.ano,
-    round(avg(f.tempo_tramitacao_dias), 1) as tempo_medio_dias
-from 'data/gold/fato_processo.parquet' f
-join 'data/gold/dim_comarca.parquet' c  on f.comarca_id = c.comarca_id
-join 'data/gold/dim_classe.parquet'  cl on f.classe_id  = cl.classe_id
-join 'data/gold/dim_tempo.parquet'   t  on f.data_distribuicao = t.data
-where f.tempo_tramitacao_dias is not null
+    round(avg(f.tempo_atendimento_dias), 1) as tempo_medio_dias
+from 'data/gold/fato_chamado.parquet' f
+join 'data/gold/dim_unidade.parquet' c  on f.unidade_id = c.unidade_id
+join 'data/gold/dim_categoria.parquet'  cl on f.categoria_id  = cl.categoria_id
+join 'data/gold/dim_tempo.parquet'   t  on f.data_abertura = t.data
+where f.tempo_atendimento_dias is not null
 group by 1, 2, 3;
 ```
 

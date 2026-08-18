@@ -1,12 +1,12 @@
-name: tribunal
-profile: tribunal
+name: central_servicos
+profile: central_servicos
 version: 1.0.0
 
 model-paths:
   - models
 
 models:
-  tribunal:
+  central_servicos:
     silver:
       # Silver materializada como Parquet em data/silver/ (medallion visível!).
       # "external" = grava ARQUIVO no storage, em vez de tabela no banco.

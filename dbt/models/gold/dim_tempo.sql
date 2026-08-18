@@ -12,7 +12,7 @@
 -- se conecta a ela.
 --
 -- ROLE-PLAYING: a fato usa esta dimensão em DOIS papéis —
--- data_distribuicao e data_baixa. A mesma tabela, dois significados.
+-- data_abertura e data_fechamento. A mesma tabela, dois significados.
 --
 -- ⚠ Note que ela NÃO vem de nenhuma fonte: é GERADA. Uma dimensão de
 -- calendário não existe em sistema transacional nenhum — ela é
@@ -24,13 +24,13 @@
 with datas as (
 
     -- calendário contínuo entre a menor e a maior data do fato.
-    -- Precisa ser CONTÍNUO (todos os dias, inclusive os sem processo),
+    -- Precisa ser CONTÍNUO (todos os dias, inclusive os sem chamado),
     -- senão faltariam períodos nos relatórios.
     select
         cast(range as date) as data
     from range(
-        (select min(data_distribuicao) from {{ ref('stg_processos') }}),
-        (select coalesce(max(data_baixa), current_date) from {{ ref('stg_processos') }}) + interval 1 day,
+        (select min(data_abertura) from {{ ref('stg_chamados') }}),
+        (select coalesce(max(data_fechamento), current_date) from {{ ref('stg_chamados') }}) + interval 1 day,
         interval 1 day
     )
 

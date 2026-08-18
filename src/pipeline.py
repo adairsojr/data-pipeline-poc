@@ -24,10 +24,10 @@ def main() -> None:
     logger.info("Iniciando pipeline de ingestão")
 
     etapas = [
-        ingest.ingest_processos,
-        ingest.ingest_comarcas,
-        ingest.ingest_classes,
-        ingest.ingest_movimentacoes,
+        ingest.ingest_chamados,
+        ingest.ingest_unidades,
+        ingest.ingest_categorias,
+        ingest.ingest_interacoes,
     ]
 
     for etapa in etapas:

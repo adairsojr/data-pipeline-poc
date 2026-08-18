@@ -19,10 +19,10 @@ from src import ingest
 from src.config import DATA_BRONZE_PATH, DATA_RAW_PATH
 
 
-def test_ingest_processos_gera_parquet():
+def test_ingest_chamados_gera_parquet():
     """A ingestão deve produzir o arquivo Parquet no Bronze."""
-    ingest.ingest_processos()
-    assert (DATA_BRONZE_PATH / "processos.parquet").exists()
+    ingest.ingest_chamados()
+    assert (DATA_BRONZE_PATH / "chamados.parquet").exists()
 
 
 def test_bronze_preserva_todas_as_linhas_da_origem():
@@ -33,9 +33,9 @@ def test_bronze_preserva_todas_as_linhas_da_origem():
     aqui"), este teste falha — e é isso que queremos, porque limpeza
     é papel da Silver, não da captura.
     """
-    ingest.ingest_processos()
-    origem = pd.read_csv(DATA_RAW_PATH / "processos.csv", dtype=str)
-    bronze = pd.read_parquet(DATA_BRONZE_PATH / "processos.parquet")
+    ingest.ingest_chamados()
+    origem = pd.read_csv(DATA_RAW_PATH / "chamados.csv", dtype=str)
+    bronze = pd.read_parquet(DATA_BRONZE_PATH / "chamados.parquet")
     assert len(bronze) == len(origem)
 
 
@@ -46,29 +46,29 @@ def test_bronze_tem_metadado_de_ingestao():
     pipeline. Numa implementação madura, entrariam também o nome do
     arquivo de origem e um hash do conteúdo.
     """
-    ingest.ingest_comarcas()
-    bronze = pd.read_parquet(DATA_BRONZE_PATH / "comarcas.parquet")
+    ingest.ingest_unidades()
+    bronze = pd.read_parquet(DATA_BRONZE_PATH / "unidades.parquet")
     assert "_ingerido_em" in bronze.columns
 
 
-def test_ingest_movimentacoes_gera_parquet_com_colunas():
+def test_ingest_interacoes_gera_parquet_com_colunas():
     """A ingestão do JSON produz Parquet com as colunas esperadas.
 
     Repare: o teste é igual ao do CSV. Para o resto do pipeline, a
     diferença de formato na origem desapareceu — foi absorvida pela
     ingestão.
     """
-    ingest.ingest_movimentacoes()
-    destino = DATA_BRONZE_PATH / "movimentacoes.parquet"
+    ingest.ingest_interacoes()
+    destino = DATA_BRONZE_PATH / "interacoes.parquet"
     assert destino.exists()
     bronze = pd.read_parquet(destino)
-    for coluna in ["processo_id", "tipo_movimento", "data_movimento"]:
+    for coluna in ["chamado_id", "tipo_interacao", "data_interacao"]:
         assert coluna in bronze.columns
 
 
-def test_bronze_movimentacoes_preserva_eventos():
+def test_bronze_interacoes_preserva_eventos():
     """O Bronze do JSON também preserva a contagem da origem."""
-    ingest.ingest_movimentacoes()
-    origem = pd.read_json(DATA_RAW_PATH / "movimentacoes.json")
-    bronze = pd.read_parquet(DATA_BRONZE_PATH / "movimentacoes.parquet")
+    ingest.ingest_interacoes()
+    origem = pd.read_json(DATA_RAW_PATH / "interacoes.json")
+    bronze = pd.read_parquet(DATA_BRONZE_PATH / "interacoes.parquet")
     assert len(bronze) == len(origem)

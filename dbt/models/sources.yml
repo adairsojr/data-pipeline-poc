@@ -11,14 +11,14 @@ sources:
       arquivos diretamente via external_location — não é preciso
       carregar nada num servidor de banco.
     tables:
-      - name: processos
-        description: Processos judiciais capturados do sistema transacional (CSV).
-      - name: comarcas
-        description: Cadastro de comarcas (CSV).
-      - name: classes
-        description: Cadastro de classes processuais (CSV).
-      - name: movimentacoes
-        description: Eventos de movimentação processual (JSON). Só existe após o desafio de ingestão.
+      - name: chamados
+        description: Chamados abertos na Central de Serviços, capturados do sistema transacional (CSV).
+      - name: unidades
+        description: Cadastro de unidades de atendimento (CSV).
+      - name: categorias
+        description: Cadastro de categorias de chamado (CSV).
+      - name: interacoes
+        description: Eventos ocorridos dentro de cada chamado (JSON). Grão de EVENTO, não de chamado.
     config:
       meta:
         # external_location é o que permite ao DuckDB ler o Parquet

@@ -1,7 +1,7 @@
 # Em projetos reais, o profiles.yml costuma ficar FORA do repositório (~/.dbt/),
 # porque carrega credenciais de banco. Aqui não há credencial nenhuma —
 # o "banco" é um arquivo DuckDB local — então versionamos para simplificar a aula.
-tribunal:
+central_servicos:
   target: dev
   outputs:
     dev:

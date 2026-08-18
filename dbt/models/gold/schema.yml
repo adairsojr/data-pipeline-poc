@@ -18,47 +18,47 @@ version: 2
 # =====================================================================
 
 models:
-  - name: fato_processo
+  - name: fato_chamado
     description: >
-      Tabela fato no grão de processo (uma linha = um processo).
-      Contém a medida tempo_tramitacao_dias e as chaves para as
-      dimensões comarca, classe e tempo.
+      Tabela fato no grão de chamado (uma linha = um chamado).
+      Contém a medida tempo_atendimento_dias e as chaves para as
+      dimensões unidade, categoria e tempo.
     columns:
-      - name: processo_id
-        description: Identificador do processo (dimensão degenerada).
+      - name: chamado_id
+        description: Identificador do chamado (dimensão degenerada).
         tests:
           - not_null
-          - unique     # garante o GRÃO: um processo não pode repetir
-      - name: comarca_id
-        description: Chave para dim_comarca.
+          - unique     # garante o GRÃO: um chamado não pode repetir
+      - name: unidade_id
+        description: Chave para dim_unidade.
         tests:
-          # o "FK que não existe": procura processos apontando para
-          # comarca inexistente. Passa porque o modelo já filtra —
+          # o "FK que não existe": procura chamados apontando para
+          # unidade inexistente. Passa porque o modelo já filtra —
           # mas o teste continua vigiando cargas futuras.
           - relationships:
               arguments:
-                to: ref('dim_comarca')
-                field: comarca_id
-      - name: classe_id
-        description: Chave para dim_classe.
+                to: ref('dim_unidade')
+                field: unidade_id
+      - name: categoria_id
+        description: Chave para dim_categoria.
         tests:
           - relationships:
               arguments:
-                to: ref('dim_classe')
-                field: classe_id
+                to: ref('dim_categoria')
+                field: categoria_id
 
-  - name: dim_comarca
-    description: Dimensão conformada de comarca.
+  - name: dim_unidade
+    description: Dimensão conformada de unidade de atendimento.
     columns:
-      - name: comarca_id
+      - name: unidade_id
         tests:
           - not_null
           - unique     # dimensão com chave duplicada causaria fan-out
 
-  - name: dim_classe
-    description: Dimensão conformada de classe processual.
+  - name: dim_categoria
+    description: Dimensão conformada de categoria de chamado.
     columns:
-      - name: classe_id
+      - name: categoria_id
         tests:
           - not_null
           - unique
