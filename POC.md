@@ -114,7 +114,17 @@ cat dbt/target/compiled/central_servicos/models/silver/schema.yml/not_null_stg_c
 
 Sete consultas comentadas: a pergunta oficial, o ranking por unidade, a evolução por ano, a análise por equipe — mais **três armadilhas** para demonstrar ao vivo (o `group by equipe_id` sozinho, o fan-out ao misturar grãos, e o efeito de um único registro implausível sobre o ranking).
 
-### 8. O lineage
+### 8. O dashboard · `app/dashboard.py`
+
+O consumo com rosto de produto: um painel Streamlit sobre a Gold, com os filtros sendo exatamente as três dimensões (unidade · categoria · período).
+
+```bash
+streamlit run app/dashboard.py
+```
+
+Repare no código: **zero regra de negócio** — nulos, tempos negativos e a unidade inexistente foram decididos no pipeline. Trocar o Streamlit por Power BI ou Metabase produziria o mesmo número. Essa é a função da Gold.
+
+### 9. O lineage
 
 ```bash
 cd dbt && dbt docs generate && dbt docs serve

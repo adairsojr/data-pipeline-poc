@@ -8,3 +8,5 @@ python-dotenv>=1.0
 pytest>=8.0
 # para rodar o notebook de exploração no VS Code/Jupyter:
 ipykernel>=6.0
+# para o dashboard de consumo da Gold (app/dashboard.py):
+streamlit>=1.30
