@@ -16,7 +16,7 @@ dados bons (o contrário).
 import pandas as pd
 
 from src import ingest
-from src.config import DATA_BRONZE_PATH, DATA_RAW_PATH
+from src.ingest import DATA_BRONZE_PATH, DATA_RAW_PATH
 
 
 def test_ingest_chamados_gera_parquet():

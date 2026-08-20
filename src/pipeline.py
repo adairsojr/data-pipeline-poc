@@ -9,12 +9,13 @@ Execução:  python -m src.pipeline
 """
 
 import logging
+import os
 
 from src import ingest
-from src.config import LOG_LEVEL
 
+# O nível de log vem do .env (carregado em src/ingest.py na importação).
 logging.basicConfig(
-    level=LOG_LEVEL,
+    level=os.getenv("LOG_LEVEL", "INFO"),
     format="[%(levelname)s] %(message)s",
 )
 logger = logging.getLogger(__name__)

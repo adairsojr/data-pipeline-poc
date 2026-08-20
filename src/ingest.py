@@ -17,11 +17,24 @@ origem quis nos dar, com os defeitos que ela tinha.
 """
 
 import logging
+import os
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pandas as pd
+from dotenv import load_dotenv
 
-from src.config import DATA_BRONZE_PATH, DATA_RAW_PATH
+# ---------------------------------------------------------------------
+# Configuração: vem do .env (que cada pessoa cria a partir do
+# .env.example). Caminhos NÃO ficam hardcoded no código — o mesmo
+# código roda em qualquer máquina; só o .env muda. Em projetos reais,
+# é no .env que entrariam credenciais, hosts de banco, buckets etc.
+# ---------------------------------------------------------------------
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+load_dotenv(PROJECT_ROOT / ".env")
+
+DATA_RAW_PATH = PROJECT_ROOT / os.getenv("DATA_RAW_PATH", "data/raw")
+DATA_BRONZE_PATH = PROJECT_ROOT / os.getenv("DATA_BRONZE_PATH", "data/bronze")
 
 logger = logging.getLogger(__name__)
 

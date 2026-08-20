@@ -92,8 +92,7 @@ data-pipeline-poc/
 │   └── analytics.duckdb  #   catálogo/serving do DuckDB (gerado no 1º dbt run)
 │
 ├── src/                  # código de INGESTÃO (Python)
-│   ├── config.py         #   lê o .env e centraliza caminhos (nada hardcoded)
-│   ├── ingest.py         #   uma função de ingestão por fonte (Pandas -> Parquet)
+│   ├── ingest.py         #   ingestão por fonte (lê o .env; Pandas -> Parquet)
 │   └── pipeline.py       #   orquestrador: executa as ingestões em sequência
 │
 ├── dbt/                  # projeto de TRANSFORMAÇÃO (dbt)
