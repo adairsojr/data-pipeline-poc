@@ -1,0 +1,14 @@
+# =====================================================================
+# PACKAGES — o "requirements.txt do dbt"
+# =====================================================================
+# Assim como o Python tem o pip, o dbt tem um gerenciador de pacotes:
+# `dbt deps` lê este arquivo e baixa os pacotes para dbt_packages/
+# (que fica fora do Git, como qualquer dependência).
+#
+# dbt_utils é o pacote canônico da comunidade — usamos aqui o
+# generate_surrogate_key(), que cria a SK como um HASH determinístico
+# da chave de negócio (ver dim_unidade.sql).
+# =====================================================================
+packages:
+  - package: dbt-labs/dbt_utils
+    version: [">=1.0.0", "<2.0.0"]

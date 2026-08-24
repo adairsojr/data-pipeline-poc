@@ -51,10 +51,12 @@ fato, unidades, categorias = carregar()
 # no consumo — exatamente como desenhado na aula.
 # ---------------------------------------------------------------------
 df = (
-    fato.merge(unidades, on="unidade_id")
-        .merge(categorias, on="categoria_id")
+    fato.merge(unidades, on="unidade_sk")
+        .merge(categorias, on="categoria_sk")
 )
-df["ano"] = df["data_abertura"].astype("datetime64[ns]").dt.year
+# a SK de data é a "smart key" AAAAMMDD — o ano é os 4 primeiros
+# dígitos, sem precisar de join com a dim_tempo
+df["ano"] = df["data_abertura_sk"] // 10000
 
 # ---------------------------- filtros --------------------------------
 st.sidebar.header("Filtros (as dimensões!)")

@@ -15,6 +15,10 @@
 {{ config(location='../data/gold/dim_categoria.parquet') }}
 
 select
+    -- SK hash da chave de negócio — mesma técnica e mesmos motivos
+    -- explicados em dim_unidade.sql.
+    {{ dbt_utils.generate_surrogate_key(['categoria_id']) }} as categoria_sk,
+
     categoria_id,
     nome_categoria
 from {{ ref('stg_categorias') }}

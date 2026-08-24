@@ -12,7 +12,7 @@
 -- médias se corrompem. Isso se chama FAN-OUT e é o erro nº 1 com fatos.
 --
 -- ANATOMIA DE UMA FATO — só três tipos de coluna:
---   1. chaves para as dimensões (unidade_id, categoria_id, datas)
+--   1. chaves para as dimensões (unidade_sk, categoria_sk, datas_sk)
 --   2. dimensões degeneradas (chamado_id, equipe_id)
 --   3. MEDIDAS (tempo_atendimento_dias)
 -- Atributo descritivo (como nome_unidade) NÃO entra: é da dimensão.
@@ -35,9 +35,19 @@ with chamados as (
 )
 
 select
-    c.chamado_id,           -- dimensão degenerada (identificador)
-    c.unidade_id,           -- FK -> dim_unidade
-    c.categoria_id,         -- FK -> dim_categoria
+    -- =================================================================
+    -- AS SURROGATE KEYS — como a fato "encontra" a SK da dimensão
+    -- =================================================================
+    -- No Kimball clássico (SK sequencial), a carga da fato faria um
+    -- JOIN de lookup na dimensão para buscar a SK. Com SK por HASH não
+    -- precisa: aplicando a MESMA função sobre a MESMA chave de negócio,
+    -- o resultado é idêntico ao da dimensão — determinismo é isso.
+    -- (O teste `relationships` no schema.yml confere que bate.)
+    {{ dbt_utils.generate_surrogate_key(['c.chamado_id']) }}   as chamado_sk,
+    {{ dbt_utils.generate_surrogate_key(['c.unidade_id']) }}   as unidade_sk,   -- FK -> dim_unidade
+    {{ dbt_utils.generate_surrogate_key(['c.categoria_id']) }} as categoria_sk, -- FK -> dim_categoria
+
+    c.chamado_id,           -- dimensão degenerada (identificador de negócio)
 
     -- equipe_id é uma DIMENSÃO DEGENERADA: fica na própria fato porque a
     -- origem só nos dá o identificador, sem nome nem atributos — não há
@@ -54,8 +64,13 @@ select
     -- diferentes: isso se chama ROLE-PLAYING DIMENSION.
     -- Consequência: "chamados abertos em 2025" e "chamados fechados
     -- em 2025" são perguntas diferentes, com joins diferentes.
-    c.data_abertura,
-    c.data_fechamento,
+    --
+    -- A SK de data é a "smart key" AAAAMMDD (ver dim_tempo.sql) —
+    -- por isso dá para filtrar por faixa sem join:
+    --   where data_abertura_sk between 20250101 and 20251231
+    -- Chamado em andamento não tem fechamento: a SK fica NULA.
+    cast(strftime(c.data_abertura,   '%Y%m%d') as integer) as data_abertura_sk,
+    cast(strftime(c.data_fechamento, '%Y%m%d') as integer) as data_fechamento_sk,
 
     c.situacao,
 

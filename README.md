@@ -98,6 +98,7 @@ data-pipeline-poc/
 ├── dbt/                  # projeto de TRANSFORMAÇÃO (dbt)
 │   ├── dbt_project.yml   #   configuração do projeto (camadas, materializações)
 │   ├── profiles.yml      #   conexão com o DuckDB (sem credenciais -> versionado)
+│   ├── packages.yml      #   dependências (dbt_utils -> surrogate keys); dbt deps
 │   └── models/
 │       ├── sources.yml   #   declara o Bronze como fonte (source) do dbt
 │       ├── silver/       #   stg_*: tipagem, limpeza, padronização (1 .sql por tabela)
@@ -132,6 +133,7 @@ data-pipeline-poc/
 | Qualidade de dados como código | `dbt/models/*/schema.yml` |
 | `source()` × `ref()` e a DAG | `sources.yml` + qualquer modelo Gold |
 | Grão, medida e dimensão | `fato_chamado.sql` |
+| Surrogate key (hash) × chave de negócio | `dim_unidade.sql` + `packages.yml` |
 | Dimensão degenerada, conformada e role-playing | `fato_chamado.sql`, `dim_unidade.sql`, `dim_tempo.sql` |
 | Integridade sem chave estrangeira | teste `relationships` em `gold/schema.yml` |
 | O que a governança decide (e o SQL não) | `stg_categorias.sql` |
@@ -147,9 +149,9 @@ select
     t.ano,
     round(avg(f.tempo_atendimento_dias), 1) as tempo_medio_dias
 from 'data/gold/fato_chamado.parquet' f
-join 'data/gold/dim_unidade.parquet' c  on f.unidade_id = c.unidade_id
-join 'data/gold/dim_categoria.parquet'  cl on f.categoria_id  = cl.categoria_id
-join 'data/gold/dim_tempo.parquet'   t  on f.data_abertura = t.data
+join 'data/gold/dim_unidade.parquet' c  on f.unidade_sk = c.unidade_sk
+join 'data/gold/dim_categoria.parquet'  cl on f.categoria_sk  = cl.categoria_sk
+join 'data/gold/dim_tempo.parquet'   t  on f.data_abertura_sk = t.data_sk
 where f.tempo_atendimento_dias is not null
 group by 1, 2, 3;
 ```

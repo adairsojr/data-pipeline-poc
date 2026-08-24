@@ -17,7 +17,25 @@
 {{ config(location='../data/gold/dim_unidade.parquet') }}
 
 select
-    unidade_id,        -- chave natural (veio da origem)
+    -- =================================================================
+    -- SURROGATE KEY — a identidade que o WAREHOUSE dá à unidade
+    -- =================================================================
+    -- A chave de negócio (unidade_id) responde "quem é essa unidade?".
+    -- A surrogate responde "qual VERSÃO dela, neste warehouse?" — e
+    -- existe para: integrar várias fontes (dois sistemas com id = 3
+    -- colidiriam), habilitar SCD Type 2 (versões da mesma unidade) e
+    -- proteger o modelo de chaves recicladas na origem.
+    --
+    -- ⚠ Repare: NÃO é um contador sequencial. É um HASH determinístico
+    -- da chave de negócio (md5, por baixo). Motivo: nosso pipeline é
+    -- IDEMPOTENTE — cada dbt run reconstrói tudo, e um contador
+    -- renumeraria as linhas a cada run. O hash sai IGUAL em qualquer
+    -- run, em qualquer máquina.
+    --
+    -- generate_surrogate_key vem do pacote dbt_utils (packages.yml).
+    {{ dbt_utils.generate_surrogate_key(['unidade_id']) }} as unidade_sk,
+
+    unidade_id,        -- chave natural (veio da origem) — vira atributo
     nome_unidade,      -- já padronizado na Silver
     uf
 from {{ ref('stg_unidades') }}

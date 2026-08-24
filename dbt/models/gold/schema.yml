@@ -24,40 +24,76 @@ models:
       Contém a medida tempo_atendimento_dias e as chaves para as
       dimensões unidade, categoria e tempo.
     columns:
-      - name: chamado_id
-        description: Identificador do chamado (dimensão degenerada).
+      - name: chamado_sk
+        description: Surrogate key do chamado (hash de chamado_id).
         tests:
           - not_null
           - unique     # garante o GRÃO: um chamado não pode repetir
-      - name: unidade_id
+      - name: chamado_id
+        description: Identificador de negócio (dimensão degenerada).
+        tests:
+          - not_null
+      - name: unidade_sk
         description: Chave para dim_unidade.
         tests:
           # o "FK que não existe": procura chamados apontando para
           # unidade inexistente. Passa porque o modelo já filtra —
           # mas o teste continua vigiando cargas futuras.
+          #
+          # Repare que agora ele confere HASH contra HASH: prova que a
+          # SK calculada na fato bate com a SK calculada na dimensão.
           - relationships:
               arguments:
                 to: ref('dim_unidade')
-                field: unidade_id
-      - name: categoria_id
+                field: unidade_sk
+      - name: categoria_sk
         description: Chave para dim_categoria.
         tests:
           - relationships:
               arguments:
                 to: ref('dim_categoria')
-                field: categoria_id
+                field: categoria_sk
+      - name: data_abertura_sk
+        description: Papel "abertura" da dim_tempo (smart key AAAAMMDD).
+        tests:
+          # ROLE-PLAYING testado: cada papel tem seu próprio teste
+          # contra a MESMA dimensão de calendário.
+          - relationships:
+              arguments:
+                to: ref('dim_tempo')
+                field: data_sk
+      - name: data_fechamento_sk
+        description: >
+          Papel "fechamento" da dim_tempo. NULA para chamado em
+          andamento — o teste relationships ignora nulos, então só
+          confere as datas que existem.
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_tempo')
+                field: data_sk
 
   - name: dim_unidade
     description: Dimensão conformada de unidade de atendimento.
     columns:
-      - name: unidade_id
+      - name: unidade_sk
+        description: Surrogate key (hash da chave de negócio).
         tests:
           - not_null
           - unique     # dimensão com chave duplicada causaria fan-out
+      - name: unidade_id
+        description: Chave de negócio (vinda da origem).
+        tests:
+          - not_null
+          - unique     # 1 versão por unidade (sem SCD2, id também é único)
 
   - name: dim_categoria
     description: Dimensão conformada de categoria de chamado.
     columns:
+      - name: categoria_sk
+        tests:
+          - not_null
+          - unique
       - name: categoria_id
         tests:
           - not_null
@@ -66,6 +102,11 @@ models:
   - name: dim_tempo
     description: Dimensão de calendário, gerada pelo pipeline.
     columns:
+      - name: data_sk
+        description: Smart key AAAAMMDD (a exceção aceita pelo Kimball).
+        tests:
+          - not_null
+          - unique
       - name: data
         tests:
           - not_null

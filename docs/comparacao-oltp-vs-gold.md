@@ -68,7 +68,7 @@ select
     count(*)                                 as chamados_resolvidos,
     round(avg(f.tempo_atendimento_dias), 1)  as tempo_medio_dias
 from 'data/gold/fato_chamado.parquet' f
-join 'data/gold/dim_unidade.parquet'  u on f.unidade_id = u.unidade_id
+join 'data/gold/dim_unidade.parquet'  u on f.unidade_sk = u.unidade_sk
 where f.tempo_atendimento_dias is not null
 group by 1, 2
 having count(*) >= 3

@@ -37,6 +37,18 @@ with datas as (
 )
 
 select
+    -- =================================================================
+    -- data_sk — a EXCEÇÃO à regra da surrogate key
+    -- =================================================================
+    -- Nas outras dimensões a SK é um hash sem significado. A dimensão
+    -- de DATA é a única em que o Kimball aceita uma "smart key": o
+    -- inteiro AAAAMMDD (20250315). Motivos: é legível no debug, ordena
+    -- cronologicamente e permite particionar/filtrar por faixa
+    -- (BETWEEN 20250101 AND 20251231) sem join.
+    -- Não há risco de colisão nem de versão: 2025-03-15 é 2025-03-15
+    -- em qualquer fonte — data não tem SCD.
+    cast(strftime(data, '%Y%m%d') as integer) as data_sk,
+
     data,
     extract(year from data)   as ano,
     extract(month from data)  as mes,

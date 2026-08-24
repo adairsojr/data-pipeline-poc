@@ -39,7 +39,7 @@ classificada as (
         -- dentro de um modelo dbt.
         row_number() over (
             partition by cast(categoria_id as integer)
-            order by (nome_categoria = upper(nome_categoria)) asc
+            order by (nome_categoria = upper(nome_categoria)) asc --em SQL false < true, o asc põe o false no topo
         ) as rn
 
     from fonte

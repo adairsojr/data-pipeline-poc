@@ -16,8 +16,9 @@ pip install -r requirements.txt
 cp .env.example .env
 
 python -m src.pipeline        # Fontes -> Bronze
-cd dbt && dbt run             # Bronze -> Silver -> Gold
-dbt test                      # 20 testes de qualidade
+cd dbt && dbt deps            # baixa o pacote dbt_utils (1ª vez)
+dbt run                       # Bronze -> Silver -> Gold
+dbt test                      # 29 testes de qualidade
 ```
 
 O que esperar:
@@ -91,9 +92,9 @@ Onde o dado ganha **forma** para responder à pergunta.
 | Modelo | O que demonstra |
 |---|---|
 | `fato_chamado.sql` | grão, medida derivada, dimensão degenerada, decisões de negócio explícitas |
-| `dim_unidade.sql` | dimensão conformada + nota sobre SCD |
+| `dim_unidade.sql` | dimensão conformada, **surrogate key** (hash) + nota sobre SCD |
 | `dim_categoria.sql` | como um problema não tratado na Silver contaminaria a Gold |
-| `dim_tempo.sql` | dimensão gerada (não vem de fonte nenhuma) e role-playing |
+| `dim_tempo.sql` | dimensão gerada (não vem de fonte nenhuma), smart key AAAAMMDD e role-playing |
 
 O `fato_chamado.sql` é o coração: leia os comentários da medida `tempo_atendimento_dias` — eles explicam por que chamados em andamento ficam nulos, por que tempo negativo é descartado, e por que a medida é guardada **por chamado** em vez de já agregada.
 

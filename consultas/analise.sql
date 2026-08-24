@@ -23,13 +23,15 @@ select
     t.ano,
     count(*)                                   as chamados_resolvidos,
     round(avg(f.tempo_atendimento_dias), 1)    as tempo_medio_dias
+-- Os joins agora usam as SURROGATE KEYS — a fato não carrega mais as
+-- chaves de negócio das dimensões (elas viraram atributos das dims).
 from 'data/gold/fato_chamado.parquet' f
-join 'data/gold/dim_unidade.parquet'   u on f.unidade_id   = u.unidade_id
-join 'data/gold/dim_categoria.parquet' c on f.categoria_id = c.categoria_id
+join 'data/gold/dim_unidade.parquet'   u on f.unidade_sk   = u.unidade_sk
+join 'data/gold/dim_categoria.parquet' c on f.categoria_sk = c.categoria_sk
 -- ROLE-PLAYING: aqui dim_tempo está no papel de "data de abertura".
--- Trocar para f.data_fechamento responderia outra pergunta: chamados
+-- Trocar para f.data_fechamento_sk responderia outra pergunta: chamados
 -- FECHADOS no ano, em vez de ABERTOS no ano.
-join 'data/gold/dim_tempo.parquet'     t on f.data_abertura = t.data
+join 'data/gold/dim_tempo.parquet'     t on f.data_abertura_sk = t.data_sk
 -- exclui os chamados em andamento (medida nula, por decisão do modelo)
 where f.tempo_atendimento_dias is not null
 group by 1, 2, 3
@@ -48,7 +50,7 @@ order by 1, 2, 3;
 --     count(*)                                 as chamados_resolvidos,
 --     round(avg(f.tempo_atendimento_dias), 1)  as tempo_medio_dias
 -- from 'data/gold/fato_chamado.parquet' f
--- join 'data/gold/dim_unidade.parquet' u on f.unidade_id = u.unidade_id
+-- join 'data/gold/dim_unidade.parquet' u on f.unidade_sk = u.unidade_sk
 -- where f.tempo_atendimento_dias is not null
 -- group by 1
 -- order by tempo_medio_dias desc;
@@ -63,8 +65,8 @@ order by 1, 2, 3;
 --     count(*)                                 as chamados_resolvidos,
 --     round(avg(f.tempo_atendimento_dias), 1)  as tempo_medio_dias
 -- from 'data/gold/fato_chamado.parquet' f
--- join 'data/gold/dim_unidade.parquet' u on f.unidade_id = u.unidade_id
--- join 'data/gold/dim_tempo.parquet'   t on f.data_abertura = t.data
+-- join 'data/gold/dim_unidade.parquet' u on f.unidade_sk = u.unidade_sk
+-- join 'data/gold/dim_tempo.parquet'   t on f.data_abertura_sk = t.data_sk
 -- where f.tempo_atendimento_dias is not null
 -- group by 1, 2
 -- order by 1, 2;
@@ -86,7 +88,7 @@ order by 1, 2, 3;
 --     count(*)                                 as chamados_resolvidos,
 --     round(avg(f.tempo_atendimento_dias), 1)  as tempo_medio_dias
 -- from 'data/gold/fato_chamado.parquet' f
--- join 'data/gold/dim_unidade.parquet' u on f.unidade_id = u.unidade_id
+-- join 'data/gold/dim_unidade.parquet' u on f.unidade_sk = u.unidade_sk
 -- where f.tempo_atendimento_dias is not null
 -- group by 1, 2
 -- having count(*) >= 3
@@ -102,7 +104,7 @@ order by 1, 2, 3;
 -- select
 --     equipe_id,
 --     count(*)                    as chamados,
---     count(distinct unidade_id)  as unidades_diferentes
+--     count(distinct unidade_sk)  as unidades_diferentes
 -- from 'data/gold/fato_chamado.parquet'
 -- where tempo_atendimento_dias is not null
 -- group by 1 order by 1;
@@ -136,13 +138,19 @@ order by 1, 2, 3;
 -- Ponta Porã de 13,3 para 10,9 e a faz trocar de posição com Três
 -- Lagoas no ranking — sem que nenhuma consulta acuse erro.
 --
+-- A fato não guarda mais as datas cruas — mas a SMART KEY da data
+-- (AAAAMMDD) permite reconstruí-las sem join: é uma das vantagens de
+-- uma SK "com significado" na dimensão de tempo.
+--
 -- select
 --     u.nome_unidade,
 --     round(avg(f.tempo_atendimento_dias), 1) as regra_oficial,
---     round(avg(case when f.data_fechamento is not null
---                    then date_diff('day', f.data_abertura, f.data_fechamento)
+--     round(avg(case when f.data_fechamento_sk is not null
+--                    then date_diff('day',
+--                         strptime(cast(f.data_abertura_sk   as varchar), '%Y%m%d'),
+--                         strptime(cast(f.data_fechamento_sk as varchar), '%Y%m%d'))
 --               end), 1)                      as sem_excluir_negativo
 -- from 'data/gold/fato_chamado.parquet' f
--- join 'data/gold/dim_unidade.parquet' u on f.unidade_id = u.unidade_id
+-- join 'data/gold/dim_unidade.parquet' u on f.unidade_sk = u.unidade_sk
 -- group by 1
 -- order by regra_oficial desc;
