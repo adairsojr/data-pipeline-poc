@@ -138,7 +138,7 @@ data-pipeline-poc/
 | Integridade sem chave estrangeira | teste `relationships` em `gold/schema.yml` |
 | O que a governança decide (e o SQL não) | `stg_categorias.sql` |
 | Storage × engine | `external_location` em `sources.yml` |
-| A mesma pergunta no OLTP × na Gold | `docs/comparacao-oltp-vs-gold.md` |
+| A mesma pergunta no OLTP × na Gold | `docs/comparacao-oltp-vs-gold.md`, `consultas/oltp_quatro_analistas.sql` |
 
 A consulta que fecha a jornada:
 
