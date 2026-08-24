@@ -12,7 +12,7 @@
 -- médias se corrompem. Isso se chama FAN-OUT e é o erro nº 1 com fatos.
 --
 -- ANATOMIA DE UMA FATO — só três tipos de coluna:
---   1. chaves para as dimensões (unidade_sk, categoria_sk, datas_sk)
+--   1. chaves para as dimensões (unidade_sk, categoria_sk, data_*_sk)
 --   2. dimensões degeneradas (chamado_id, equipe_id)
 --   3. MEDIDAS (tempo_atendimento_dias)
 -- Atributo descritivo (como nome_unidade) NÃO entra: é da dimensão.
@@ -43,11 +43,35 @@ select
     -- precisa: aplicando a MESMA função sobre a MESMA chave de negócio,
     -- o resultado é idêntico ao da dimensão — determinismo é isso.
     -- (O teste `relationships` no schema.yml confere que bate.)
-    {{ dbt_utils.generate_surrogate_key(['c.chamado_id']) }}   as chamado_sk,
+    --
+    -- ⚠ Note que SÓ AS CHAVES DE DIMENSÃO ganham surrogate. A fato não
+    -- tem uma SK própria — e essa ausência é deliberada, veja abaixo.
     {{ dbt_utils.generate_surrogate_key(['c.unidade_id']) }}   as unidade_sk,   -- FK -> dim_unidade
     {{ dbt_utils.generate_surrogate_key(['c.categoria_id']) }} as categoria_sk, -- FK -> dim_categoria
 
-    c.chamado_id,           -- dimensão degenerada (identificador de negócio)
+    -- =================================================================
+    -- chamado_id — DIMENSÃO DEGENERADA, e a identidade da linha
+    -- =================================================================
+    -- Por que NÃO existe um "chamado_sk" aqui?
+    --
+    -- Surrogate key de DIMENSÃO resolve problemas reais: colisão entre
+    -- fontes, versões históricas (SCD 2), chave reciclada na origem.
+    -- Surrogate key de FATO resolveria outro problema: dar um
+    -- identificador único de linha quando a chave natural é COMPOSTA
+    -- ou não existe.
+    --
+    -- Não é o nosso caso: o grão é um chamado por linha, e chamado_id
+    -- já é único, já está aqui e ainda por cima é LEGÍVEL. Um hash
+    -- dele seria a mesma informação, duas vezes — e confundiria quem
+    -- acabou de aprender o que é dimensão degenerada.
+    --
+    -- Quem garante o grão é o teste `unique` sobre esta coluna.
+    --
+    -- ⚠ QUANDO ISSO MUDARIA: se o grão passasse a ser "um chamado POR
+    -- REABERTURA", a chave natural viraria composta
+    -- (chamado_id + reabertura_seq) e aí sim valeria um chamado_sk
+    -- gerado das duas colunas.
+    c.chamado_id,
 
     -- equipe_id é uma DIMENSÃO DEGENERADA: fica na própria fato porque a
     -- origem só nos dá o identificador, sem nome nem atributos — não há

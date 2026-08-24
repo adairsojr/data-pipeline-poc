@@ -24,15 +24,15 @@ models:
       Contém a medida tempo_atendimento_dias e as chaves para as
       dimensões unidade, categoria e tempo.
     columns:
-      - name: chamado_sk
-        description: Surrogate key do chamado (hash de chamado_id).
+      - name: chamado_id
+        description: >
+          Identificador de negócio do chamado (dimensão degenerada).
+          É também a identidade da linha: a fato NÃO tem surrogate key
+          própria, porque o grão é um chamado por linha e esta coluna
+          já é única e legível.
         tests:
           - not_null
           - unique     # garante o GRÃO: um chamado não pode repetir
-      - name: chamado_id
-        description: Identificador de negócio (dimensão degenerada).
-        tests:
-          - not_null
       - name: unidade_sk
         description: Chave para dim_unidade.
         tests:
