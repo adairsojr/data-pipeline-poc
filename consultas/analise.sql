@@ -121,13 +121,15 @@ order by 1, 2, 3;
 -- A média sobe 41% porque chamados demorados acumulam mais interações
 -- e passam a pesar mais.
 --
+-- ⚠ Sem filtro de nulo nas duas: o avg() do SQL já ignora nulos sozinho,
+--    e assim as CONTAGENS mostram o inchaço de linhas — que é o ponto.
+--
 -- select count(*) as linhas, round(avg(tempo_atendimento_dias),1) as media
--- from 'data/gold/fato_chamado.parquet' where tempo_atendimento_dias is not null;
+-- from 'data/gold/fato_chamado.parquet';
 --
 -- select count(*) as linhas, round(avg(f.tempo_atendimento_dias),1) as media
 -- from 'data/gold/fato_chamado.parquet' f
--- join 'data/silver/stg_interacoes.parquet' i on i.chamado_id = f.chamado_id
--- where f.tempo_atendimento_dias is not null;
+-- join 'data/silver/stg_interacoes.parquet' i on i.chamado_id = f.chamado_id;
 
 
 -- =====================================================================
