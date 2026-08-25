@@ -122,6 +122,7 @@ data-pipeline-poc/
 ├── tests/                # pytest: testa o CÓDIGO da ingestão
 └── docs/
     ├── architecture.md              # camadas, decisões e as 5 etapas do dbt run
+    ├── anomalias-das-fontes.md      # os 15 defeitos, arquivo por arquivo
     └── comparacao-oltp-vs-gold.md   # a mesma pergunta: no OLTP × na Gold
 ```
 
@@ -145,7 +146,7 @@ data-pipeline-poc/
 | Integridade sem chave estrangeira | teste `relationships` em `gold/schema.yml` |
 | O que a governança decide (e o SQL não) | `stg_categorias.sql` |
 | Storage × engine | `external_location` em `sources.yml` |
-| Quatro fontes, nenhuma chave entre elas | `consultas/dados_brutos.sql` |
+| Quatro fontes, nenhuma chave entre elas | `consultas/dados_brutos.sql`, `docs/anomalias-das-fontes.md` |
 | A mesma pergunta no OLTP × na Gold | `docs/comparacao-oltp-vs-gold.md` |
 
 A consulta que fecha a jornada:
