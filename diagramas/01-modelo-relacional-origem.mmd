@@ -1,0 +1,53 @@
+erDiagram
+  %% O SISTEMA QUE GEROU AS NOSSAS FONTES
+  %% Modelo relacional (OLTP) da Central de Serviços — normalizado e
+  %% orientado a eventos. É este banco que exporta os 4 arquivos de
+  %% data/raw/. Reproduzível com: python scripts/criar_oltp_simulado.py
+  %% Dois pontos que a aula explora:
+  %%   1. chamado NÃO tem data_fechamento — o fechamento é uma interação
+  %%      do tipo "Encerramento";
+  %%   2. a unidade vem VIA equipe — não há unidade_id no chamado.
+    UNIDADE ||--o{ EQUIPE : "tem"
+    EQUIPE  ||--o{ CHAMADO : "atende"
+    CATEGORIA ||--o{ CHAMADO : "classifica"
+    SITUACAO  ||--o{ CHAMADO : "estado atual"
+    CHAMADO ||--o{ INTERACAO : "registra"
+    TIPO_INTERACAO ||--o{ INTERACAO : "qualifica"
+
+    UNIDADE {
+        integer unidade_id PK "8 linhas"
+        varchar nome_unidade
+        varchar uf
+    }
+    EQUIPE {
+        integer equipe_id PK "40 linhas"
+        integer unidade_id FK
+        integer numero_equipe
+        varchar nome_equipe
+    }
+    CATEGORIA {
+        integer categoria_id PK "6 linhas"
+        varchar nome_categoria
+    }
+    SITUACAO {
+        integer situacao_id PK "2 linhas"
+        varchar descricao
+    }
+    CHAMADO {
+        bigint chamado_id PK "118 linhas"
+        varchar protocolo
+        integer categoria_id FK
+        integer equipe_id FK
+        integer situacao_id FK
+        date data_abertura "NAO existe data_fechamento"
+    }
+    INTERACAO {
+        bigint interacao_id PK "434 linhas"
+        bigint chamado_id FK
+        integer tipo_interacao_id FK
+        date data_interacao
+    }
+    TIPO_INTERACAO {
+        integer tipo_interacao_id PK "7 linhas"
+        varchar descricao "Abertura, Triagem, ... Encerramento"
+    }

@@ -1,0 +1,24 @@
+flowchart LR
+  %% A JORNADA DO DADO — as 7 etapas, e quem faz o quê
+  %% O mapa da aula. Cada caixa vira código executável na PoC.
+    A["1. FONTES<br/><small>CSV + JSON</small><br/><small>data/raw/</small>"]
+    B["2. INGESTAO<br/><small>Python + Pandas</small><br/><small>src/ingest.py</small>"]
+    C["3. BRONZE<br/><small>preservado, sem modelagem</small><br/><small>data/bronze/</small>"]
+    D["4. SILVER<br/><small>limpo e tipado — stg_*</small><br/><small>data/silver/</small>"]
+    E["5. GOLD<br/><small>fato + dimensoes</small><br/><small>data/gold/</small>"]
+    F["6. SERVING<br/><small>DuckDB — catalogo</small><br/><small>data/analytics.duckdb</small>"]
+    G["7. CONSUMO<br/><small>SQL e Streamlit</small><br/><small>10,8 dias</small>"]
+
+    A --> B --> C
+    C -->|"dbt · source()"| D
+    D -->|"dbt · ref()"| E
+    E --> F --> G
+
+    C -.->|"preservar"| N1[/"defeitos entram<br/>e ficam registrados"/]
+    D -.->|"confiar"| N2[/"28 testes<br/>de qualidade"/]
+    E -.->|"consumir"| N3[/"a regra mora<br/>num lugar so"/]
+
+    classDef etapa fill:#fff,stroke:#123C6D,stroke-width:2px,color:#123C6D
+    classDef nota fill:#F8FAFC,stroke:#94A3B8,stroke-dasharray:4 3,color:#475569
+    class A,B,C,D,E,F,G etapa
+    class N1,N2,N3 nota

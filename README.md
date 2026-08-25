@@ -106,6 +106,9 @@ data-pipeline-poc/
 │       └── gold/         #   fato_chamado + dimensões (modelo analítico)
 │           └── schema.yml#   testes de qualidade da Gold
 │
+├── diagramas/            # os diagramas em Mermaid (diagrama como código)
+│   ├── README.md         #   renderiza tudo; explica como ver no VS Code
+│   └── *.mmd             #   modelo da origem · DAG · star schema · jornada
 ├── notebooks/
 │   └── exploracao.ipynb  # explorar os dados de cada camada (opcional)
 ├── consultas/
