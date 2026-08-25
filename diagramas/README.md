@@ -29,10 +29,17 @@ Aí precisa de outra extensão:
 - **Mermaid Preview** (`vstirbu.vscode-mermaid-preview`) — mais leve.
   `Cmd+Shift+P` → "Mermaid: Preview".
 
-### Sem instalar nada
+### Sem instalar nada: `ver-diagramas.html`
 
-Copie o conteúdo de qualquer `.mmd` e cole em <https://mermaid.live>. Renderiza na hora e
-exporta PNG ou SVG — é o caminho mais rápido para gerar imagem para um slide.
+**Dê duplo clique em `diagramas/ver-diagramas.html`.** Ele abre no navegador e renderiza
+os quatro diagramas, sem depender de extensão nenhuma do VS Code. É a saída garantida
+quando o preview do Markdown não coopera.
+
+Precisa de internet na primeira vez (o Mermaid vem de um CDN). Se você editar um `.mmd`,
+rode `python diagramas/gerar_html.py` para atualizar a página.
+
+E para gerar imagem para um slide: copie o conteúdo do `.mmd` e cole em
+<https://mermaid.live> — renderiza na hora e exporta PNG ou SVG.
 
 ### No GitHub
 

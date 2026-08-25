@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Diagramas — PoC A Jornada do Dado</title>
+<style>
+  body { font-family: -apple-system, Helvetica, Arial, sans-serif; max-width: 1400px;
+         margin: 0 auto; padding: 32px 24px 80px; color: #1e293b; line-height: 1.6; }
+  h1 { color: #123C6D; border-bottom: 3px solid #123C6D; padding-bottom: 12px; }
+  h2 { color: #123C6D; margin-top: 48px; }
+  .desc { color: #475569; }
+  .fonte { color: #94a3b8; font-size: 13px; margin-top: 4px; }
+  code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 90%; }
+  section { border-bottom: 1px solid #e2e8f0; padding-bottom: 32px; }
+  .mermaid { background: #fff; padding: 16px 0; overflow-x: auto; }
+  .aviso { background: #FEF9E7; border-left: 4px solid #B7791F; padding: 12px 16px;
+            border-radius: 4px; font-size: 14px; }
+</style>
+</head>
+<body>
+<h1>Diagramas — PoC "A Jornada do Dado"</h1>
+<p>Renderizado direto no navegador, sem depender de extensão do VS Code.
+   <b>Abra este arquivo com duplo clique.</b></p>
+<p class="aviso">Precisa de internet na primeira vez: o Mermaid é carregado de um CDN.
+   Os diagramas são gerados a partir dos arquivos <code>.mmd</code> desta pasta — se
+   editar um <code>.mmd</code>, rode <code>python diagramas/gerar_html.py</code> para
+   atualizar esta página.</p>
+
+  <section>
+    <h2>1. O modelo relacional da origem</h2>
+    <p class="desc">O sistema que gerou os quatro arquivos de <code>data/raw/</code>: normalizado e orientado a eventos. Repare que <b>chamado não tem data_fechamento</b> — o fechamento é uma interação do tipo "Encerramento" — e que <b>a unidade vem via equipe</b>.</p>
+    <div class="mermaid">erDiagram
+  %% O SISTEMA QUE GEROU AS NOSSAS FONTES
+  %% Modelo relacional (OLTP) da Central de Serviços — normalizado e
+  %% orientado a eventos. É este banco que exporta os 4 arquivos de
+  %% data/raw/. Reproduzível com: python scripts/criar_oltp_simulado.py
+  %% Dois pontos que a aula explora:
+  %%   1. chamado NÃO tem data_fechamento — o fechamento é uma interação
+  %%      do tipo &quot;Encerramento&quot;;
+  %%   2. a unidade vem VIA equipe — não há unidade_id no chamado.
+    UNIDADE ||--o{ EQUIPE : &quot;tem&quot;
+    EQUIPE  ||--o{ CHAMADO : &quot;atende&quot;
+    CATEGORIA ||--o{ CHAMADO : &quot;classifica&quot;
+    SITUACAO  ||--o{ CHAMADO : &quot;estado atual&quot;
+    CHAMADO ||--o{ INTERACAO : &quot;registra&quot;
+    TIPO_INTERACAO ||--o{ INTERACAO : &quot;qualifica&quot;
+
+    UNIDADE {
+        integer unidade_id PK &quot;8 linhas&quot;
+        varchar nome_unidade
+        varchar uf
+    }
+    EQUIPE {
+        integer equipe_id PK &quot;40 linhas&quot;
+        integer unidade_id FK
+        integer numero_equipe
+        varchar nome_equipe
+    }
+    CATEGORIA {
+        integer categoria_id PK &quot;6 linhas&quot;
+        varchar nome_categoria
+    }
+    SITUACAO {
+        integer situacao_id PK &quot;2 linhas&quot;
+        varchar descricao
+    }
+    CHAMADO {
+        bigint chamado_id PK &quot;118 linhas&quot;
+        varchar protocolo
+        integer categoria_id FK
+        integer equipe_id FK
+        integer situacao_id FK
+        date data_abertura &quot;NAO existe data_fechamento&quot;
+    }
+    INTERACAO {
+        bigint interacao_id PK &quot;434 linhas&quot;
+        bigint chamado_id FK
+        integer tipo_interacao_id FK
+        date data_interacao
+    }
+    TIPO_INTERACAO {
+        integer tipo_interacao_id PK &quot;7 linhas&quot;
+        varchar descricao &quot;Abertura, Triagem, ... Encerramento&quot;
+    }
+</div>
+    <p class="fonte">fonte: <code>diagramas/01-modelo-relacional-origem.mmd</code></p>
+  </section>
+  <section>
+    <h2>2. A DAG do pipeline</h2>
+    <p class="desc">O grafo que o dbt <b>deduz</b> dos <code>source()</code> e <code>ref()</code>. Ninguém escreve a ordem de execução. Repare que a fato não aponta para as dimensões: estrela é modelo lógico, DAG é ordem de construção.</p>
+    <div class="mermaid">flowchart LR
+  %% A DAG DO PIPELINE — o que o dbt deduz dos source() e ref()
+  %% Confere com: cd dbt &amp;&amp; dbt docs generate &amp;&amp; dbt docs serve
+  %% Ou com o manifest: dbt/target/manifest.json
+  %% Repare: a fato NÃO aponta para as dimensões. Estrela é modelo
+  %% lógico (como consultar); DAG é ordem de construção.
+    subgraph FONTES[&quot;FONTES (data/raw)&quot;]
+        f1[&quot;chamados.csv&lt;br/&gt;122&quot;]
+        f2[&quot;unidades.csv&lt;br/&gt;8&quot;]
+        f3[&quot;categorias.csv&lt;br/&gt;7&quot;]
+        f4[&quot;interacoes.json&lt;br/&gt;408&quot;]
+    end
+
+    subgraph BRONZE[&quot;BRONZE — Python/Pandas&quot;]
+        b1[(bronze.chamados)]
+        b2[(bronze.unidades)]
+        b3[(bronze.categorias)]
+        b4[(bronze.interacoes)]
+    end
+
+    subgraph SILVER[&quot;SILVER — dbt, usa source()&quot;]
+        s1[&quot;stg_chamados&lt;br/&gt;119&quot;]
+        s2[&quot;stg_unidades&lt;br/&gt;8&quot;]
+        s3[&quot;stg_categorias&lt;br/&gt;6&quot;]
+        s4[&quot;stg_interacoes&lt;br/&gt;403&quot;]
+    end
+
+    subgraph GOLD[&quot;GOLD — dbt, usa ref()&quot;]
+        g1[&quot;fato_chamado&lt;br/&gt;118&quot;]
+        g2[&quot;dim_unidade&quot;]
+        g3[&quot;dim_categoria&quot;]
+        g4[&quot;dim_tempo&quot;]
+    end
+
+    f1 --&gt; b1 --&gt; s1
+    f2 --&gt; b2 --&gt; s2
+    f3 --&gt; b3 --&gt; s3
+    f4 --&gt; b4 --&gt; s4
+
+    s1 --&gt; g1
+    s2 --&gt; g1
+    s2 --&gt; g2
+    s3 --&gt; g3
+    s1 --&gt; g4
+
+    g1 --&gt; R([&quot;Resposta: 10,8 dias&quot;])
+    g2 --&gt; R
+    g3 --&gt; R
+    g4 --&gt; R
+
+    classDef bronze fill:#FFF4E6,stroke:#DD6B20,color:#7C2D12
+    classDef silver fill:#F1F5F9,stroke:#64748B,color:#1E293B
+    classDef gold   fill:#FEF9E7,stroke:#B7791F,color:#744210
+    classDef fonte  fill:#fff,stroke:#94A3B8,color:#334155
+    class b1,b2,b3,b4 bronze
+    class s1,s2,s3,s4 silver
+    class g1,g2,g3,g4 gold
+    class f1,f2,f3,f4 fonte
+</div>
+    <p class="fonte">fonte: <code>diagramas/02-dag-pipeline.mmd</code></p>
+  </section>
+  <section>
+    <h2>3. O modelo dimensional da Gold</h2>
+    <p class="desc">O star schema implementado. Grão: uma linha = um chamado (118 linhas, 94 com medida). Só as chaves de dimensão ganham surrogate key.</p>
+    <div class="mermaid">erDiagram
+  %% O MODELO DIMENSIONAL DA GOLD — o star schema implementado
+  %% Grão: uma linha = um chamado (118 linhas; 94 com medida).
+  %% Só as chaves de DIMENSÃO ganham surrogate key. A fato não tem SK
+  %% própria: chamado_id (degenerada) já identifica a linha.
+  %%   - unidade_sk / categoria_sk : hash (dbt_utils.generate_surrogate_key)
+  %%   - data_sk                    : smart key AAAAMMDD (a exceção do Kimball)
+    DIM_UNIDADE   ||--o{ FATO_CHAMADO : &quot;onde&quot;
+    DIM_CATEGORIA ||--o{ FATO_CHAMADO : &quot;o que&quot;
+    DIM_TEMPO     ||--o{ FATO_CHAMADO : &quot;quando (abertura)&quot;
+    DIM_TEMPO     ||--o{ FATO_CHAMADO : &quot;quando (fechamento)&quot;
+
+    FATO_CHAMADO {
+        varchar unidade_sk FK &quot;hash&quot;
+        varchar categoria_sk FK &quot;hash&quot;
+        integer data_abertura_sk FK &quot;AAAAMMDD&quot;
+        integer data_fechamento_sk FK &quot;nulo se em andamento&quot;
+        bigint chamado_id &quot;DD - identifica a linha&quot;
+        integer equipe_id &quot;DD - sem cadastro proprio&quot;
+        varchar situacao
+        bigint tempo_atendimento_dias &quot;A MEDIDA - derivada&quot;
+    }
+    DIM_UNIDADE {
+        varchar unidade_sk PK &quot;hash de unidade_id&quot;
+        integer unidade_id &quot;chave de negocio&quot;
+        varchar nome_unidade
+        varchar uf
+    }
+    DIM_CATEGORIA {
+        varchar categoria_sk PK &quot;hash de categoria_id&quot;
+        integer categoria_id &quot;chave de negocio&quot;
+        varchar nome_categoria
+    }
+    DIM_TEMPO {
+        integer data_sk PK &quot;AAAAMMDD&quot;
+        date data
+        integer ano
+        integer mes
+        varchar nome_mes
+        integer trimestre
+        boolean fim_de_semana
+    }
+</div>
+    <p class="fonte">fonte: <code>diagramas/03-modelo-dimensional.mmd</code></p>
+  </section>
+  <section>
+    <h2>4. A jornada do dado</h2>
+    <p class="desc">As sete etapas do mapa da aula, cada uma virando código executável.</p>
+    <div class="mermaid">flowchart LR
+  %% A JORNADA DO DADO — as 7 etapas, e quem faz o quê
+  %% O mapa da aula. Cada caixa vira código executável na PoC.
+    A[&quot;1. FONTES&lt;br/&gt;&lt;small&gt;CSV + JSON&lt;/small&gt;&lt;br/&gt;&lt;small&gt;data/raw/&lt;/small&gt;&quot;]
+    B[&quot;2. INGESTAO&lt;br/&gt;&lt;small&gt;Python + Pandas&lt;/small&gt;&lt;br/&gt;&lt;small&gt;src/ingest.py&lt;/small&gt;&quot;]
+    C[&quot;3. BRONZE&lt;br/&gt;&lt;small&gt;preservado, sem modelagem&lt;/small&gt;&lt;br/&gt;&lt;small&gt;data/bronze/&lt;/small&gt;&quot;]
+    D[&quot;4. SILVER&lt;br/&gt;&lt;small&gt;limpo e tipado — stg_*&lt;/small&gt;&lt;br/&gt;&lt;small&gt;data/silver/&lt;/small&gt;&quot;]
+    E[&quot;5. GOLD&lt;br/&gt;&lt;small&gt;fato + dimensoes&lt;/small&gt;&lt;br/&gt;&lt;small&gt;data/gold/&lt;/small&gt;&quot;]
+    F[&quot;6. SERVING&lt;br/&gt;&lt;small&gt;DuckDB — catalogo&lt;/small&gt;&lt;br/&gt;&lt;small&gt;data/analytics.duckdb&lt;/small&gt;&quot;]
+    G[&quot;7. CONSUMO&lt;br/&gt;&lt;small&gt;SQL e Streamlit&lt;/small&gt;&lt;br/&gt;&lt;small&gt;10,8 dias&lt;/small&gt;&quot;]
+
+    A --&gt; B --&gt; C
+    C --&gt;|&quot;dbt · source()&quot;| D
+    D --&gt;|&quot;dbt · ref()&quot;| E
+    E --&gt; F --&gt; G
+
+    C -.-&gt;|&quot;preservar&quot;| N1[/&quot;defeitos entram&lt;br/&gt;e ficam registrados&quot;/]
+    D -.-&gt;|&quot;confiar&quot;| N2[/&quot;28 testes&lt;br/&gt;de qualidade&quot;/]
+    E -.-&gt;|&quot;consumir&quot;| N3[/&quot;a regra mora&lt;br/&gt;num lugar so&quot;/]
+
+    classDef etapa fill:#fff,stroke:#123C6D,stroke-width:2px,color:#123C6D
+    classDef nota fill:#F8FAFC,stroke:#94A3B8,stroke-dasharray:4 3,color:#475569
+    class A,B,C,D,E,F,G etapa
+    class N1,N2,N3 nota
+</div>
+    <p class="fonte">fonte: <code>diagramas/04-jornada-medallion.mmd</code></p>
+  </section>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'default', er: { useMaxWidth: false },
+                       flowchart: { useMaxWidth: false } });
+</script>
+</body>
+</html>
