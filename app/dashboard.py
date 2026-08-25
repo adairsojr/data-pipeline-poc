@@ -90,7 +90,10 @@ c2.metric("Resolvidos com medida", len(resolvidos))
 c3.metric("Em andamento", int((df["situacao"] == "Em andamento").sum()))
 c4.metric(
     "Tempo médio (dias)",
-    f"{resolvidos['tempo_atendimento_dias'].mean():.1f}" if len(resolvidos) else "—",
+    # ⚠ pt-BR usa VÍRGULA como separador decimal. O Python formata com
+    # ponto; a troca é manual porque não há locale garantido na máquina.
+    f"{resolvidos['tempo_atendimento_dias'].mean():.1f}".replace(".", ",")
+    if len(resolvidos) else "—",
 )
 
 # ----------------------------- gráficos ------------------------------
@@ -122,7 +125,16 @@ por_categoria = (
     .agg(chamados="count", tempo_medio_dias="mean").round(1)
     .sort_values("tempo_medio_dias", ascending=False)
 )
-st.dataframe(por_categoria, use_container_width=True)
+# O Styler do pandas formata em pt-BR sem converter para texto: a coluna
+# continua numérica (alinhada à direita e ordenável), só a EXIBIÇÃO muda.
+st.dataframe(
+    por_categoria.style.format(
+        {"chamados": "{:.0f}", "tempo_medio_dias": "{:.1f}"},
+        decimal=",",
+        thousands=".",
+    ),
+    use_container_width=True,
+)
 
 # ------------------------- rodapé didático ---------------------------
 st.divider()
