@@ -27,19 +27,49 @@ DESTINO.unlink(missing_ok=True)          # sempre do zero, evita schema antigo
 con = duckdb.connect(str(DESTINO))
 
 con.execute("""
-create or replace table unidade (unidade_id integer primary key, nome_unidade varchar, uf varchar);
-create or replace table equipe (equipe_id integer primary key, unidade_id integer, numero_equipe integer, nome_equipe varchar);
-create or replace table categoria (categoria_id integer primary key, nome_categoria varchar);
-create or replace table situacao (situacao_id integer primary key, descricao varchar);
-create or replace table tipo_interacao (tipo_interacao_id integer primary key, descricao varchar);
+-- ⚠ AS CHAVES ESTRANGEIRAS SÃO O PONTO DA AULA.
+-- Este banco tem PK e FK de verdade: é ele que IMPEDE a gravação
+-- inválida. Quando o dado sai daqui para um CSV, essa garantia some —
+-- e é por isso que, no lake, a integridade vira um TESTE.
+-- As FKs também fazem o DBeaver desenhar as ligações no diagrama.
+
+create or replace table unidade (
+    unidade_id integer primary key,
+    nome_unidade varchar not null,
+    uf varchar not null
+);
+create or replace table categoria (
+    categoria_id integer primary key,
+    nome_categoria varchar not null           -- o CSV terá o id 2 repetido; aqui é impossível
+);
+create or replace table situacao (
+    situacao_id integer primary key,
+    descricao varchar not null
+);
+create or replace table tipo_interacao (
+    tipo_interacao_id integer primary key,
+    descricao varchar not null
+);
+create or replace table equipe (
+    equipe_id integer primary key,
+    unidade_id integer not null references unidade(unidade_id),
+    numero_equipe integer not null,
+    nome_equipe varchar not null
+);
 create or replace table chamado (
-    chamado_id bigint primary key, protocolo varchar, categoria_id integer,
-    equipe_id integer, situacao_id integer, data_abertura date
+    chamado_id bigint primary key,
+    protocolo varchar not null,
+    categoria_id integer not null references categoria(categoria_id),
+    equipe_id integer not null references equipe(equipe_id),
+    situacao_id integer not null references situacao(situacao_id),
+    data_abertura date not null
     -- NÃO existe data_fechamento: o fechamento é uma interação
 );
 create or replace table interacao (
-    interacao_id bigint primary key, chamado_id bigint,
-    tipo_interacao_id integer, data_interacao date
+    interacao_id bigint primary key,
+    chamado_id bigint not null references chamado(chamado_id),
+    tipo_interacao_id integer not null references tipo_interacao(tipo_interacao_id),
+    data_interacao date not null
 );
 """)
 

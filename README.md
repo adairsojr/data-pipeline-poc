@@ -114,10 +114,11 @@ data-pipeline-poc/
 │   └── exploracao.ipynb  # explorar os dados de cada camada (opcional)
 ├── consultas/
 │   ├── analise.sql       # o consumo: 5 consultas comentadas (+ 2 armadilhas)
-│   └── oltp_quatro_analistas.sql  # o slide dos 4 analistas, executável
+│   ├── dados_brutos.sql  # os 4 analistas + os defeitos, lidos direto de raw/
+│   └── oltp_quatro_analistas.sql  # o mesmo, mas no OLTP normalizado
 ├── scripts/
 │   ├── criar_oltp_simulado.py   # monta o OLTP normalizado em data/ (p/ comparação)
-│   └── rodar_bloco.py           # roda um bloco do .sql acima, por vez
+│   └── rodar_bloco.py           # roda um bloco dos .sql acima, por vez
 ├── tests/                # pytest: testa o CÓDIGO da ingestão
 └── docs/
     ├── architecture.md              # camadas, decisões e as 5 etapas do dbt run

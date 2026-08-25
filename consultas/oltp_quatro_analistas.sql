@@ -283,3 +283,42 @@ join tipo_interacao ti on ti.tipo_interacao_id = i.tipo_interacao_id
 where ti.descricao = 'Encerramento'
   and c.data_abertura is not null
   and i.data_interacao >= c.data_abertura;
+
+
+-- =====================================================================
+-- 7) O QUE O BANCO IMPEDIA — rode ISTO no DBeaver, não pelo script
+-- =====================================================================
+-- Este OLTP tem PK e FK de verdade. Os mesmos defeitos que estão
+-- tranquilos nos arquivos CSV são RECUSADOS aqui.
+--
+-- Rode uma linha por vez, no DBeaver, e leia a mensagem de erro em voz
+-- alta. É a prova viva do slide 17.
+--
+-- ⚠ precisa de conexão de ESCRITA (sem duckdb.read_only).
+
+--   1) o id de categoria repetido — o defeito de categorias.csv
+--    -> Constraint Error: Duplicate key "categoria_id: 2" violates
+--       primary key constraint.
+-- insert into categoria values (2, 'REDE E INTERNET');
+
+--   2) a unidade 99 — o defeito do chamado 500060
+--    -> Constraint Error: Violates foreign key constraint because key
+--       "unidade_id: 99" does not exist in the referenced table
+-- insert into equipe values (999, 99, 1, 'Equipe fantasma');
+
+--   3) interação de um chamado que não existe
+--    -> Constraint Error: Violates foreign key constraint because key
+--       "chamado_id: 888888" does not exist in the referenced table
+-- insert into interacao values (999999, 888888, 1, '2025-01-01');
+
+-- DIGO: "O banco RECUSOU. Agora olhem o mesmo dado, tranquilo, dentro
+--        do nosso Parquet — porque arquivo não tem chave nenhuma.
+--        A garantia não se perdeu por acidente: ela ficou para trás
+--        quando o dado saiu do banco. No lake, ela volta como TESTE."
+
+-- E o contrário, para fechar: as FKs deste banco, listadas pelo próprio
+-- catálogo — é isso que o DBeaver usa para desenhar as ligações.
+select table_name, constraint_text
+from duckdb_constraints()
+where constraint_type = 'FOREIGN KEY'
+order by table_name;
