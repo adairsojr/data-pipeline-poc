@@ -161,6 +161,44 @@ where fe is not null and fe >= ab;
 --        da instituição inteira. E o SQL não reclamou."
 
 
+-- ---------------------------------------------------------------------
+-- E a decisão nº 2 do slide: a linha duplicada no chamados.csv
+-- ---------------------------------------------------------------------
+-- O arquivo traz 2 chamados repetidos INTEGRALMENTE (500025 e 500117),
+-- como se o export tivesse sido concatenado duas vezes. Sem remover,
+-- eles entram duas vezes na média.
+
+with b as (
+    select
+        try_cast(chamado_id as bigint) as chamado_id,
+        try_cast(categoria_id as integer) as categoria_id,
+        try_cast(unidade_id as integer) as unidade_id,
+        try_cast(equipe_id as integer) as equipe_id,
+        coalesce(try_cast(data_abertura as date),
+                 try_cast(try_strptime(data_abertura, '%d/%m/%Y') as date)) as ab,
+        coalesce(try_cast(data_fechamento as date),
+                 try_cast(try_strptime(data_fechamento, '%d/%m/%Y') as date)) as fe,
+        situacao
+    from 'data/bronze/chamados.parquet' where chamado_id is not null
+),
+un as (select try_cast(unidade_id as integer) as unidade_id from 'data/bronze/unidades.parquet')
+
+select 'com as duplicatas' as etapa, count(*) as linhas,
+       round(avg(date_diff('day', ab, fe)), 2) as media
+from b where fe is not null and fe >= ab and unidade_id in (select unidade_id from un)
+union all
+select 'sem as duplicatas (distinct)', count(*), round(avg(date_diff('day', ab, fe)), 2)
+from (select distinct * from b)
+where fe is not null and fe >= ab and unidade_id in (select unidade_id from un);
+
+-- RESULTADO ESPERADO:
+--   com as duplicatas   ->  96 linhas   11.21 dias
+--   sem as duplicatas   ->  94 linhas   10.83 dias   (o número oficial)
+--
+-- DIGO: "Meio dia de diferença, por duas linhas repetidas num arquivo
+--        de 122. Duas linhas."
+
+
 -- as quatro fontes, e o tamanho de cada uma
 select 'chamados.csv'    as fonte, count(*) as linhas from 'data/bronze/chamados.parquet'
 union all select 'unidades.csv',    count(*) from 'data/bronze/unidades.parquet'
