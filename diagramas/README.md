@@ -7,29 +7,38 @@ de nenhuma ferramenta de desenho.
 É a mesma ideia que a aula defende para o SQL: se o pipeline é código, o desenho do
 pipeline também deveria ser.
 
-## Como visualizar no VS Code
+## Como visualizar
 
-Instale a extensão **Markdown Preview Mermaid Support** (`bierner.markdown-mermaid`) —
-é a mais simples e não precisa de configuração:
+### O jeito mais rápido: este próprio arquivo
 
-1. `Cmd+Shift+X` para abrir as extensões
-2. buscar por `Markdown Preview Mermaid Support`
-3. instalar
+Instale a extensão **Markdown Preview Mermaid Support** (`bierner.markdown-mermaid`):
+`Cmd+Shift+X`, buscar pelo nome, instalar.
 
-Depois disso, **abra este `README.md` e aperte `Cmd+Shift+V`**: todos os diagramas
-abaixo aparecem renderizados.
+Depois **abra este `README.md` e aperte `Cmd+Shift+V`** — os quatro diagramas aparecem
+renderizados de uma vez, com a explicação de cada um.
 
-Para editar um `.mmd` e ver o resultado enquanto digita, instale também a
-**Mermaid Editor** (`tomoyukim.vscode-mermaid-editor`) ou a **Mermaid Preview**
-(`vstirbu.vscode-mermaid-preview`) — aí o preview funciona direto no arquivo `.mmd`,
-com `Cmd+Shift+P` → "Mermaid: Preview".
+⚠ **Essa extensão NÃO renderiza arquivos `.mmd`.** Ela só adiciona Mermaid ao preview de
+Markdown. Se você abrir um `.mmd`, vai ver só o texto — é o comportamento esperado.
 
-**Sem instalar nada:** cole o conteúdo de qualquer `.mmd` em <https://mermaid.live> —
-renderiza na hora e exporta PNG ou SVG. É também o jeito mais rápido de gerar imagem
-para colar num slide.
+### Para pré-visualizar um `.mmd` direto
 
-**No GitHub:** blocos ` ```mermaid ` em arquivos `.md` renderizam sozinhos. Por isso os
-quatro diagramas estão embutidos aqui embaixo, além de existirem como `.mmd`.
+Aí precisa de outra extensão:
+
+- **Mermaid Chart** (`MermaidChart.vscode-mermaid-chart`) — a oficial. Abre o `.mmd` e
+  aparece um botão de preview no canto superior direito.
+- **Mermaid Preview** (`vstirbu.vscode-mermaid-preview`) — mais leve.
+  `Cmd+Shift+P` → "Mermaid: Preview".
+
+### Sem instalar nada
+
+Copie o conteúdo de qualquer `.mmd` e cole em <https://mermaid.live>. Renderiza na hora e
+exporta PNG ou SVG — é o caminho mais rápido para gerar imagem para um slide.
+
+### No GitHub
+
+Blocos ` ```mermaid ` em arquivos `.md` renderizam sozinhos. Por isso os quatro diagramas
+estão embutidos aqui embaixo, além de existirem como `.mmd` — o `.mmd` é a fonte, este
+README é a vitrine.
 
 ---
 
