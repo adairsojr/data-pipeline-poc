@@ -1,19 +1,12 @@
-"""Cria um sistema de chamados normalizado (OLTP) para a demonstração.
+"""MATERIAL OPCIONAL - o banco relacional que a PoC NAO tem.
 
-Gera data/chamados_oltp.duckdb com o modelo relacional normalizado a
-partir das mesmas fontes da PoC — para comparar, ao vivo, a consulta no
-OLTP com a consulta na Gold (ver docs/comparacao-oltp-vs-gold.md).
+⚠ A aula parte de QUATRO FONTES que vieram de lugares diferentes: quatro
+arquivos, dois formatos, nenhuma chave estrangeira. Este script existe para
+o CONTRAFACTUAL: montar o banco relacional que teria impedido os defeitos,
+e provar isso ao vivo (as PK e FK aqui sao de verdade; o DuckDB recusa).
 
-A diferença mais importante que este script materializa: no OLTP **não
-existe** uma coluna `data_fechamento`. O fechamento é um EVENTO na
-tabela de interações, como qualquer outro andamento. É por isso que a
-mesma pergunta exige uma CTE e quatro joins do lado transacional.
-
-Uso, da raiz do projeto:
-    python scripts/criar_oltp_simulado.py
-    python -c "from pathlib import Path
-
-import duckdb; con=duckdb.connect('data/chamados_oltp.duckdb'); print(con.sql('show tables'))"
+Nao e pre-requisito de nada. A aula roda inteira sem ele - veja
+consultas/dados_brutos.sql, que le os quatro arquivos direto.
 """
 
 from pathlib import Path

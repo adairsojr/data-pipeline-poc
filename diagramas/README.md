@@ -49,10 +49,17 @@ README é a vitrine.
 
 ---
 
-## 1. O modelo relacional da origem
+## 1. O modelo relacional que NÃO temos
 
-O sistema que gerou os nossos quatro arquivos: normalizado, orientado a eventos.
-Reproduzível com `python scripts/criar_oltp_simulado.py`.
+⚠ **Este diagrama é um contrafactual, não a nossa origem.** A PoC parte de **quatro
+fontes que vieram de lugares diferentes** — quatro arquivos, dois formatos, nenhuma
+chave estrangeira entre eles. Não existe um banco por trás.
+
+O desenho abaixo mostra como seria **se** tudo tivesse vindo de um único sistema
+relacional. Serve para uma coisa só: deixar visível o que se perdeu no caminho —
+a chave primária que impediria o `categoria_id` repetido, e a chave estrangeira que
+impediria o chamado órfão. Reproduzível com `python scripts/criar_oltp_simulado.py`,
+e lá as restrições são de verdade: o DuckDB recusa os dois defeitos na tela.
 
 Dois pontos que a aula explora:
 
@@ -109,8 +116,8 @@ erDiagram
     }
 ```
 
-**O que a origem exportou.** Os quatro arquivos de `data/raw/` são *exports
-desnormalizados* deste modelo:
+**As quatro fontes que realmente temos.** Se um sistema assim existisse, os arquivos
+de `data/raw/` seriam *exports desnormalizados* dele:
 
 | Arquivo | Vem de | Linhas |
 |---|---|---|

@@ -1,4 +1,17 @@
 -- =====================================================================
+-- MATERIAL OPCIONAL — o contrafactual: e se viesse de um banco?
+-- =====================================================================
+-- ⚠ A AULA NÃO PRECISA DESTE ARQUIVO. Ela parte de QUATRO FONTES que
+-- vieram de lugares diferentes — quatro arquivos, dois formatos,
+-- nenhuma chave estrangeira. Para isso, use consultas/dados_brutos.sql.
+--
+-- Este aqui monta a MESMA pergunta sobre um banco relacional normalizado
+-- (gerado por scripts/criar_oltp_simulado.py) e serve para um contraste
+-- só: mostrar o que se perdeu quando o dado virou arquivo. As PK e FK
+-- daquele banco são de verdade — o bloco 7 prova ao vivo.
+-- =====================================================================
+
+-- =====================================================================
 -- SLIDE 4 — "Então por que não fazemos simplesmente um AVG no OLTP?"
 -- =====================================================================
 -- Este arquivo REPRODUZ AO VIVO o slide dos quatro analistas.

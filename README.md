@@ -115,9 +115,9 @@ data-pipeline-poc/
 ├── consultas/
 │   ├── analise.sql       # o consumo: 5 consultas comentadas (+ 2 armadilhas)
 │   ├── dados_brutos.sql  # os 4 analistas + os defeitos, lidos direto de raw/
-│   └── oltp_quatro_analistas.sql  # o mesmo, mas no OLTP normalizado
+│   └── oltp_quatro_analistas.sql  # OPCIONAL: o contrafactual, num banco
 ├── scripts/
-│   ├── criar_oltp_simulado.py   # monta o OLTP normalizado em data/ (p/ comparação)
+│   ├── criar_oltp_simulado.py   # OPCIONAL: o banco que a PoC NÃO tem (contraste)
 │   └── rodar_bloco.py           # roda um bloco dos .sql acima, por vez
 ├── tests/                # pytest: testa o CÓDIGO da ingestão
 └── docs/
@@ -145,7 +145,8 @@ data-pipeline-poc/
 | Integridade sem chave estrangeira | teste `relationships` em `gold/schema.yml` |
 | O que a governança decide (e o SQL não) | `stg_categorias.sql` |
 | Storage × engine | `external_location` em `sources.yml` |
-| A mesma pergunta no OLTP × na Gold | `docs/comparacao-oltp-vs-gold.md`, `consultas/oltp_quatro_analistas.sql` |
+| Quatro fontes, nenhuma chave entre elas | `consultas/dados_brutos.sql` |
+| A mesma pergunta no OLTP × na Gold | `docs/comparacao-oltp-vs-gold.md` |
 
 A consulta que fecha a jornada:
 
