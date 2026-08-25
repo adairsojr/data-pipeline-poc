@@ -106,8 +106,12 @@ with col_a:
 
 with col_b:
     st.subheader("Evolução por ano de abertura")
+    # ⚠ o ano vira TEXTO antes de agrupar. Se ficar como inteiro, o
+    # Streamlit o trata como número e escreve "2,023" no eixo, com
+    # separador de milhar. Ano é rótulo, não quantidade.
     evolucao = (
-        resolvidos.groupby("ano")["tempo_atendimento_dias"]
+        resolvidos.assign(ano=resolvidos["ano"].astype(str))
+        .groupby("ano")["tempo_atendimento_dias"]
         .mean().round(1)
     )
     st.line_chart(evolucao)

@@ -40,6 +40,37 @@ models:
               arguments:
                 values: ['Resolvido', 'Em andamento']
 
+      - name: unidade_id
+        description: Unidade responsável pelo chamado (chave estrangeira lógica).
+        tests:
+          # ⚠ ESTE TESTE FALHA DE PROPÓSITO — e é o único do projeto que
+          # falha. Não é bug: é a origem que está errada, e ninguém
+          # consertou ainda.
+          #
+          # O chamado 500060 aponta para unidade_id = 99, que não existe
+          # no cadastro. Num banco relacional a chave estrangeira teria
+          # IMPEDIDO a gravação. Em arquivos Parquet não existe FK — então
+          # a integridade vira ISTO: um teste que DETECTA, depois do fato.
+          #
+          # POR QUE AQUI E NÃO NA GOLD: o fato_chamado.sql já descarta o
+          # órfão (o `where unidade_id in (...)` no fim do modelo). O teste
+          # `relationships` da Gold roda sobre um dado JÁ limpo — nunca
+          # poderia falhar. Um teste que não pode falhar não testa nada.
+          # É aqui, ANTES do descarte, que o defeito ainda está visível.
+          #
+          # ⚠ SEVERIDADE PADRÃO (error) — DE PROPÓSITO.
+          # No `dbt build`, um teste que falha INTERROMPE a cadeia: tudo o
+          # que depende de stg_chamados é pulado (SKIP). A Gold não nasce.
+          #
+          # É o teste funcionando como DISJUNTOR: melhor não publicar do
+          # que publicar errado. Se a organização preferir registrar sem
+          # bloquear, basta acrescentar `config: {severity: warn}` — e essa
+          # escolha é de GOVERNANÇA, não de quem escreve o SQL.
+          - relationships:
+              arguments:
+                to: ref('stg_unidades')
+                field: unidade_id
+
   - name: stg_unidades
     description: Cadastro de unidades com nomes padronizados.
     columns:
