@@ -8,7 +8,7 @@ As quatro fontes de `data/raw/` chegaram de lugares diferentes, em dois formatos
 
 | Arquivo | Formato | Linhas | Anomalias próprias |
 |---|---|---|---|
-| `chamados.csv` | CSV | 122 | 6 |
+| `chamados.csv` | CSV | 122 (119 chamados) | 6 |
 | `unidades.csv` | CSV | 8 | 1 (em 4 linhas) |
 | `categorias.csv` | CSV | 7 | 1 |
 | `interacoes.json` | JSON | 408 | 3 |
@@ -16,7 +16,7 @@ As quatro fontes de `data/raw/` chegaram de lugares diferentes, em dois formatos
 
 ---
 
-## 1. `chamados.csv` — 122 linhas
+## 1. `chamados.csv` — 122 linhas, 119 chamados
 
 | # | Anomalia | Onde | Linhas | Por que passa despercebido |
 |---|---|---|---|---|
@@ -27,11 +27,31 @@ As quatro fontes de `data/raw/` chegaram de lugares diferentes, em dois formatos
 | 5 | `unidade_id` **inexistente** no cadastro | 500060 → `unidade_id` 99 | 1 | o join simplesmente descarta a linha, ou a mantém órfã, conforme o tipo de join |
 | 6 | **Fechamento antes da abertura** | 500103 → `−25` dias | 1 | entra na média como número **negativo** e puxa o resultado para baixo |
 
+**Atenção: 122 linhas não são 122 chamados.**
+
+```
+122 linhas  =  119 chamados  +  2 linhas repetidas  +  1 linha sem chamado_id
+```
+
+**E por que só 94 entram na média?** Dos 119 chamados, 25 não têm uma medida válida —
+mas os três casos são tratados de jeitos **diferentes**:
+
+| Quantos | Por quê | O que acontece |
+|---|---|---|
+| 1 | `unidade_id` 99, inexistente (chamado 500060) | **sai da fato** — não tem dimensão para onde apontar |
+| 23 | `Em andamento`, sem `data_fechamento` | **fica na fato**, medida `NULL` |
+| 1 | fechou antes de abrir (chamado 500103) | **fica na fato**, medida `NULL` |
+
+Por isso a `fato_chamado` tem **118 linhas** (119 − 1 órfão), com **94** medidas e 24 nulos.
+O `avg` do SQL ignora `NULL`, então a média sai sobre 94 sem ninguém filtrar nada.
+
+⚠ Não é correto dizer "descartamos 25 chamados": só **1** foi descartado.
+
 **O impacto medido de cada uma** (regra do analista A):
 
 | Defeito | Sem tratar | Tratado |
 |---|---|---|
-| duplicata integral (#4) | 96 linhas · **11,21** dias | 94 linhas · **10,83** dias |
+| duplicata integral (#4) | 96 chamados · **11,21** dias | 94 chamados · **10,83** dias |
 | unidade órfã (#5) | 95 linhas · **11,2** dias | 94 · **10,8** |
 | tempo negativo (#6) | 95 linhas · **10,5** dias | 94 · **10,8** |
 

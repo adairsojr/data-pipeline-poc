@@ -183,7 +183,7 @@ with b as (
 ),
 un as (select try_cast(unidade_id as integer) as unidade_id from 'data/bronze/unidades.parquet')
 
-select 'com as duplicatas' as etapa, count(*) as linhas,
+select 'com as duplicatas' as etapa, count(*) as chamados_na_media,
        round(avg(date_diff('day', ab, fe)), 2) as media
 from b where fe is not null and fe >= ab and unidade_id in (select unidade_id from un)
 union all
@@ -192,8 +192,12 @@ from (select distinct * from b)
 where fe is not null and fe >= ab and unidade_id in (select unidade_id from un);
 
 -- RESULTADO ESPERADO:
---   com as duplicatas   ->  96 linhas   11.21 dias
---   sem as duplicatas   ->  94 linhas   10.83 dias   (o número oficial)
+--   com as duplicatas   ->  96 chamados   11.21 dias
+--   sem as duplicatas   ->  94 chamados   10.83 dias   (o número oficial)
+--
+-- ⚠ 96 NÃO é o tamanho do arquivo. O arquivo tem 122 linhas; até chegar
+--   à média já saíram 1 sem id, 23 em andamento, 1 com unidade 99 e 1 com
+--   tempo negativo. Sobram 96 — e as 2 duplicatas são o último corte.
 --
 -- DIGO: "Meio dia de diferença, por duas linhas repetidas num arquivo
 --        de 122. Duas linhas."
