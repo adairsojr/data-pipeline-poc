@@ -118,7 +118,8 @@ data-pipeline-poc/
 │   └── oltp_quatro_analistas.sql  # OPCIONAL: o contrafactual, num banco
 ├── scripts/
 │   ├── criar_oltp_simulado.py   # OPCIONAL: o banco que a PoC NÃO tem (contraste)
-│   └── rodar_bloco.py           # roda um bloco dos .sql acima, por vez
+│   ├── rodar_bloco.py           # roda um bloco dos .sql acima, por vez
+│   └── zerar.py                 # apaga o que o pipeline gera (p/ nascer ao vivo)
 ├── tests/                # pytest: testa o CÓDIGO da ingestão
 └── docs/
     ├── architecture.md              # camadas, decisões e as 5 etapas do dbt run
