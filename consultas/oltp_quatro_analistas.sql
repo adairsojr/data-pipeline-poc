@@ -45,8 +45,11 @@
 -- preciso ir buscar a interação do tipo 'Encerramento'.
 
 with fechamento as (
-    -- min() e não max(): se o chamado foi REABERTO, existe mais de um
-    -- encerramento. Escolhemos o primeiro — e essa é a decisão nº 2.
+    -- ⚠ O group by NÃO é decoração: 2 chamados têm a interação de
+    -- encerramento DUPLICADA na origem. Sem agrupar, eles entrariam
+    -- duas vezes na média — é fan-out (veja o bloco 6).
+    -- O min() só decide qual das duplicatas fica; como são idênticas,
+    -- tanto faz min ou max.
     select
         i.chamado_id,
         min(i.data_interacao) as data_fechamento
@@ -233,3 +236,50 @@ order by tempo_medio_dias desc;
 -- 💬 "2 arquivos, 1 join, zero decisão. As seis decisões continuam
 --    existindo — só que foram tomadas UMA vez, no pipeline, de forma
 --    versionada, testada e documentada."
+
+
+-- =====================================================================
+-- 6) A CTE NÃO É DECORAÇÃO — o fan-out escondido no OLTP
+-- =====================================================================
+-- A consulta do slide agrupa as interações de encerramento numa CTE
+-- antes de juntar com o chamado. Parece detalhe de estilo. Não é.
+--
+-- Na origem, 2 chamados têm a interação de "Encerramento" DUPLICADA.
+-- Sem o group by, o join multiplica esses chamados: eles entram duas
+-- vezes na média.
+--
+-- Resultado esperado:
+--   com a CTE  ->  94 linhas, 10,8298 dias   (o número oficial)
+--   sem a CTE  ->  96 linhas, 11,2083 dias   (quase meio dia a mais)
+--
+-- DIGO: "Duas linhas a mais num universo de 94, e a média se move meio
+--        dia. Ninguém escreveu SQL errado — só esqueceu que a origem
+--        podia repetir um evento. É o mesmo fan-out que vamos ver no
+--        fim da aula, escondido dentro de uma CTE que parece inofensiva."
+
+with fechamento as (
+    select i.chamado_id, min(i.data_interacao) as data_fechamento
+    from interacao i
+    join tipo_interacao ti on ti.tipo_interacao_id = i.tipo_interacao_id
+    where ti.descricao = 'Encerramento'
+    group by i.chamado_id
+)
+select 'com a CTE (certo)' as versao,
+       count(*)                                                            as linhas,
+       round(avg(date_diff('day', c.data_abertura, f.data_fechamento)), 4) as media
+from chamado c
+join fechamento f on f.chamado_id = c.chamado_id
+where c.data_abertura is not null
+  and f.data_fechamento >= c.data_abertura
+
+union all
+
+select 'sem a CTE (fan-out)',
+       count(*),
+       round(avg(date_diff('day', c.data_abertura, i.data_interacao)), 4)
+from chamado c
+join interacao i       on i.chamado_id = c.chamado_id
+join tipo_interacao ti on ti.tipo_interacao_id = i.tipo_interacao_id
+where ti.descricao = 'Encerramento'
+  and c.data_abertura is not null
+  and i.data_interacao >= c.data_abertura;
