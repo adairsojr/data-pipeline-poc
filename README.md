@@ -89,7 +89,8 @@ data-pipeline-poc/
 │   ├── bronze/           #   camada Bronze: Parquet gravado pela INGESTÃO
 │   ├── silver/           #   camada Silver: Parquet gravado pelo DBT
 │   ├── gold/             #   camada Gold:   Parquet gravado pelo DBT
-│   └── analytics.duckdb  #   catálogo/serving do DuckDB (gerado no 1º dbt run)
+│   ├── analytics.duckdb  #   catálogo/serving do DuckDB (gerado no 1º dbt run)
+│   └── chamados_oltp.duckdb #  OLTP normalizado, p/ a comparação do slide 4 (gerado)
 │
 ├── src/                  # código de INGESTÃO (Python)
 │   ├── ingest.py         #   ingestão por fonte (lê o .env; Pandas -> Parquet)
@@ -115,7 +116,7 @@ data-pipeline-poc/
 │   ├── analise.sql       # o consumo: 5 consultas comentadas (+ 2 armadilhas)
 │   └── oltp_quatro_analistas.sql  # o slide dos 4 analistas, executável
 ├── scripts/
-│   ├── criar_oltp_simulado.py   # monta um OLTP normalizado p/ comparação
+│   ├── criar_oltp_simulado.py   # monta o OLTP normalizado em data/ (p/ comparação)
 │   └── rodar_bloco.py           # roda um bloco do .sql acima, por vez
 ├── tests/                # pytest: testa o CÓDIGO da ingestão
 └── docs/

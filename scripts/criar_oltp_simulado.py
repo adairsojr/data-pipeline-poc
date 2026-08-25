@@ -1,6 +1,6 @@
 """Cria um sistema de chamados normalizado (OLTP) para a demonstração.
 
-Gera /tmp/chamados_oltp.duckdb com o modelo relacional normalizado a
+Gera data/chamados_oltp.duckdb com o modelo relacional normalizado a
 partir das mesmas fontes da PoC — para comparar, ao vivo, a consulta no
 OLTP com a consulta na Gold (ver docs/comparacao-oltp-vs-gold.md).
 
@@ -11,12 +11,20 @@ mesma pergunta exige uma CTE e quatro joins do lado transacional.
 
 Uso, da raiz do projeto:
     python scripts/criar_oltp_simulado.py
-    python -c "import duckdb; con=duckdb.connect('/tmp/chamados_oltp.duckdb'); print(con.sql('show tables'))"
+    python -c "from pathlib import Path
+
+import duckdb; con=duckdb.connect('data/chamados_oltp.duckdb'); print(con.sql('show tables'))"
 """
+
+from pathlib import Path
 
 import duckdb
 
-con = duckdb.connect("/tmp/chamados_oltp.duckdb")
+# Fica em data/ junto com o resto do storage da PoC — e no .gitignore,
+# porque é artefato gerado (a regra data/*.duckdb já cobre).
+DESTINO = Path(__file__).resolve().parents[1] / "data" / "chamados_oltp.duckdb"
+DESTINO.unlink(missing_ok=True)          # sempre do zero, evita schema antigo
+con = duckdb.connect(str(DESTINO))
 
 con.execute("""
 create or replace table unidade (unidade_id integer primary key, nome_unidade varchar, uf varchar);
@@ -102,4 +110,4 @@ from (
 for t in ["unidade", "equipe", "categoria", "chamado", "interacao"]:
     n = con.execute(f"select count(*) from {t}").fetchone()[0]
     print(f"{t:15s} {n}")
-print("\nOK -> /tmp/chamados_oltp.duckdb")
+print(f"\nOK -> {DESTINO}")

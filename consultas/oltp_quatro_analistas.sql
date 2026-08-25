@@ -12,14 +12,14 @@
 -- Parquet são relativos):
 --
 --   Opção 1 (terminal, tudo de uma vez):
---     duckdb /tmp/chamados_oltp.duckdb < consultas/oltp_quatro_analistas.sql
+--     duckdb data/chamados_oltp.duckdb < consultas/oltp_quatro_analistas.sql
 --
 --   Opção 2 (terminal interativo, roda bloco a bloco):
---     duckdb /tmp/chamados_oltp.duckdb
+--     duckdb data/chamados_oltp.duckdb
 --     .read consultas/oltp_quatro_analistas.sql
 --
 --   Opção 3 (DBeaver — RECOMENDADO para a aula):
---     conexão DuckDB apontando para /tmp/chamados_oltp.duckdb
+--     conexão DuckDB apontando para data/chamados_oltp.duckdb
 --     ⚠ antes de rodar, execute UMA vez:
 --         SET file_search_path='/Users/vanessaborges/dev_repo/poc-residencia/data-pipeline-poc';
 --     (sem isso, o DBeaver não acha os Parquet dos caminhos relativos)

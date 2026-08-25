@@ -149,7 +149,7 @@ A DAG do projeto no navegador, com a documentação que nasceu dos mesmos `schem
 
 **Um teste falhando.** Comente o `coalesce` da `data_abertura` em `stg_chamados.sql` (deixando só o `try_cast`) e rode `dbt run && dbt test`. Duas datas em `DD/MM/AAAA` viram NULL e o teste `not_null` acusa. Mostra que **dado ruim quebra uma regra executável**.
 
-**O slide dos 4 analistas, ao vivo.** `python scripts/criar_oltp_simulado.py` e depois `python scripts/rodar_bloco.py 3` — as quatro versões da mesma pergunta (10,8 · 11,2 · 11,3 · 10,5), cada uma mudando UMA decisão. Arquivo comentado: `consultas/oltp_quatro_analistas.sql`.
+**O slide dos 4 analistas, ao vivo.** `python scripts/criar_oltp_simulado.py` (gera `data/chamados_oltp.duckdb`) e depois `python scripts/rodar_bloco.py 3` — as quatro versões da mesma pergunta (10,8 · 11,2 · 11,3 · 10,5), cada uma mudando UMA decisão. Arquivo comentado: `consultas/oltp_quatro_analistas.sql`.
 
 **A DAG se resolvendo sozinha.** `dbt run --select +fato_chamado` — o dbt constrói `stg_chamados` e `stg_unidades` antes, sem que ninguém tenha escrito essa ordem.
 

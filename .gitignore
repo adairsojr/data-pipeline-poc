@@ -17,7 +17,7 @@ data/gold/*
 !data/bronze/.gitkeep
 !data/silver/.gitkeep
 !data/gold/.gitkeep
-data/*.duckdb
+data/*.duckdb          # analytics.duckdb (catálogo) e chamados_oltp.duckdb (OLTP simulado)
 data/*.duckdb.wal
 
 # dbt

@@ -16,7 +16,7 @@ import duckdb
 
 RAIZ = Path(__file__).resolve().parents[1]
 ARQUIVO = RAIZ / "consultas" / "oltp_quatro_analistas.sql"
-OLTP = "/tmp/chamados_oltp.duckdb"
+OLTP = str(RAIZ / "data" / "chamados_oltp.duckdb")
 
 
 def blocos():
