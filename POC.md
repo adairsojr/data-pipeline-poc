@@ -18,7 +18,7 @@ cp .env.example .env
 python -m src.pipeline        # Fontes -> Bronze
 cd dbt && dbt deps            # baixa o pacote dbt_utils (1ª vez)
 dbt run                       # Bronze -> Silver -> Gold
-dbt test                      # 28 testes de qualidade
+dbt test                      # 29 testes (1 falha de proposito: unidade 99)
 ```
 
 O que esperar:

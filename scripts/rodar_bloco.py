@@ -13,6 +13,8 @@ Dois arquivos, dois mundos:
     brutos -> consultas/dados_brutos.sql   (le data/raw/ direto, sem banco)
     oltp   -> consultas/oltp_quatro_analistas.sql
               (precisa de python scripts/criar_oltp_simulado.py antes)
+    fontes -> consultas/mesma_pergunta_nas_fontes.sql
+              (a mesma pergunta da Gold, lida direto do CSV/JSON)
 """
 
 import re
@@ -27,6 +29,7 @@ OLTP = str(RAIZ / "data" / "chamados_oltp.duckdb")
 ARQUIVOS = {
     "brutos": RAIZ / "consultas" / "dados_brutos.sql",
     "oltp": RAIZ / "consultas" / "oltp_quatro_analistas.sql",
+    "fontes": RAIZ / "consultas" / "mesma_pergunta_nas_fontes.sql",
 }
 PADRAO = "brutos"
 
