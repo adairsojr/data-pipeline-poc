@@ -1,100 +1,47 @@
 version: 2
 
 # =====================================================================
-# TESTES DA CAMADA SILVER — qualidade de dados como CÓDIGO EXECUTÁVEL
+# TESTES DA CAMADA SILVER
 # =====================================================================
-# Cada teste vira uma consulta SQL que procura VIOLAÇÕES. Se ela
-# retorna alguma linha, o teste falha.
-#
-# Exemplo: o teste `not_null` em chamado_id compila para
-#     select chamado_id from stg_chamados where chamado_id is null
-# Nada de mágico — dá para ver o SQL gerado em dbt/target/compiled/.
-#
-# ⚠ Diferença importante:
-#   pytest    -> testa o CÓDIGO (a ingestão se comporta como esperado?)
-#   dbt test  -> testa os DADOS (eles respeitam as regras declaradas?)
+# Qualidade de dados COMO CÓDIGO: cada teste vira uma consulta que
+# procura linhas que violam a regra. Se alguma aparece, o teste falha.
+# Rode com `dbt test` (ou `dbt build`, que faz run + test).
 # =====================================================================
 
 models:
-  - name: stg_chamados
+  - name: stg_taxas
     description: >
-      Chamados tipados, deduplicados e com datas normalizadas.
-      É a base de tudo: se algo estiver errado aqui, contamina a Gold.
+      Taxas de rendimento por município (INEP 2023), limpas, tipadas e
+      padronizadas. Uma linha por município. Duplicatas removidas,
+      vírgula decimal corrigida, UF padronizada, registros sem código
+      descartados.
     columns:
-      - name: chamado_id
-        description: Identificador único do chamado (chave natural).
+      - name: codigo_municipio
+        description: Código IBGE do município (chave de negócio).
         tests:
-          - not_null   # o registro sem id foi filtrado no modelo
-          - unique     # as duplicatas integrais foram removidas
-      - name: data_abertura
-        description: Data em que o chamado foi aberto.
+          - not_null      # DEFEITO 5 tratado: sem código não passa
+          - unique        # garante o GRÃO: um município por linha (dedup ok)
+      - name: ano
+        description: Ano do Censo Escolar.
         tests:
-          - not_null   # passa graças ao tratamento dos dois formatos de data
-      - name: situacao
-        description: Situação do chamado na origem.
+          - not_null
+      - name: uf
+        description: Sigla da UF, padronizada (maiúscula, sem espaços).
         tests:
-          # accepted_values garante que a origem não invente valores novos.
-          # Se amanhã aparecer "Aguardando usuário", o teste falha e nós
-          # ficamos sabendo — em vez de descobrir por um relatório errado.
+          - not_null
+
+  - name: stg_ufs
+    description: Cadastro de UF -> região, deduplicado por sigla.
+    columns:
+      - name: uf
+        description: Sigla da UF.
+        tests:
+          - not_null
+          - unique        # DEFEITO 7 tratado: uma UF por linha
+      - name: regiao
+        description: Macrorregião do IBGE.
+        tests:
+          - not_null
           - accepted_values:
               arguments:
-                values: ['Resolvido', 'Em andamento']
-
-      - name: unidade_id
-        description: Unidade responsável pelo chamado (chave estrangeira lógica).
-        tests:
-          # ⚠ ESTE TESTE FALHA DE PROPÓSITO — e é o único do projeto que
-          # falha. Não é bug: é a origem que está errada, e ninguém
-          # consertou ainda.
-          #
-          # O chamado 500060 aponta para unidade_id = 99, que não existe
-          # no cadastro. Num banco relacional a chave estrangeira teria
-          # IMPEDIDO a gravação. Em arquivos Parquet não existe FK — então
-          # a integridade vira ISTO: um teste que DETECTA, depois do fato.
-          #
-          # POR QUE AQUI E NÃO NA GOLD: o fato_chamado.sql já descarta o
-          # órfão (o `where unidade_id in (...)` no fim do modelo). O teste
-          # `relationships` da Gold roda sobre um dado JÁ limpo — nunca
-          # poderia falhar. Um teste que não pode falhar não testa nada.
-          # É aqui, ANTES do descarte, que o defeito ainda está visível.
-          #
-          # ⚠ SEVERIDADE PADRÃO (error) — DE PROPÓSITO.
-          # No `dbt build`, um teste que falha INTERROMPE a cadeia: tudo o
-          # que depende de stg_chamados é pulado (SKIP). A Gold não nasce.
-          #
-          # É o teste funcionando como DISJUNTOR: melhor não publicar do
-          # que publicar errado. Se a organização preferir registrar sem
-          # bloquear, basta acrescentar `config: {severity: warn}` — e essa
-          # escolha é de GOVERNANÇA, não de quem escreve o SQL.
-          - relationships:
-              arguments:
-                to: ref('stg_unidades')
-                field: unidade_id
-
-  - name: stg_unidades
-    description: Cadastro de unidades com nomes padronizados.
-    columns:
-      - name: unidade_id
-        tests:
-          - not_null
-          - unique
-
-  - name: stg_categorias
-    description: Categorias de chamado deduplicadas (um registro por categoria_id).
-    columns:
-      - name: categoria_id
-        tests:
-          - not_null
-          # este `unique` é a prova de que a deduplicação funcionou:
-          # sem o row_number() do modelo, ele falharia
-          - unique
-
-  - name: stg_interacoes
-    description: Eventos ocorridos dentro dos chamados, deduplicados.
-    columns:
-      - name: chamado_id
-        tests:
-          - not_null
-      - name: data_interacao
-        tests:
-          - not_null
+                values: ["Norte", "Nordeste", "Sudeste", "Sul", "Centro-Oeste"]

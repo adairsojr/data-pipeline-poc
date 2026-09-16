@@ -3,25 +3,22 @@ version: 2
 # source() = dados que ENTRAM no domínio do dbt (produzidos pela ingestão Python).
 # ref()    = dependência entre modelos produzidos PELO PRÓPRIO dbt.
 # É com source() e ref() que o dbt descobre a DAG do projeto.
+#
+# O Bronze aqui é DELTA LAKE (não Parquet solto). Cada tabela Delta é
+# lida pelo DuckDB via delta_scan() — ver os modelos stg_*. O
+# external_location abaixo documenta ONDE cada tabela mora; a leitura
+# em si é feita com delta_scan no SQL do staging, porque o formato Delta
+# exige a função dedicada (o glob de Parquet leria os arquivos de TODAS
+# as versões de uma vez, ignorando o log de transações).
 sources:
   - name: bronze
     description: >
-      Camada Bronze: Parquet gravado pela ingestão (Python + Pandas),
-      preservando os dados próximos à origem. O dbt-duckdb lê os
-      arquivos diretamente via external_location — não é preciso
-      carregar nada num servidor de banco.
+      Camada Bronze (PRESERVAÇÃO DO BRUTO): tabelas Delta Lake gravadas
+      pela ingestão (Python + Pandas + deltalake), preservando os dados
+      próximos à origem, COM os defeitos. Cada execução do pipeline gera
+      uma nova VERSÃO da tabela Delta (time travel).
     tables:
-      - name: chamados
-        description: Chamados abertos na Central de Serviços, capturados do sistema transacional (CSV).
-      - name: unidades
-        description: Cadastro de unidades de atendimento (CSV).
-      - name: categorias
-        description: Cadastro de categorias de chamado (CSV).
-      - name: interacoes
-        description: Eventos ocorridos dentro de cada chamado (JSON). Grão de EVENTO, não de chamado.
-    config:
-      meta:
-        # external_location é o que permite ao DuckDB ler o Parquet
-        # DIRETO do disco — sem carregar nada para dentro do banco.
-        # {name} é substituído pelo nome de cada tabela abaixo.
-        external_location: "../data/bronze/{name}.parquet"
+      - name: taxas
+        description: Taxas de rendimento por município do INEP (CSV), capturadas em Delta.
+      - name: ufs
+        description: Cadastro de UF -> região capturado do JSON de origem (Delta).

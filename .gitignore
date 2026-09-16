@@ -46,3 +46,9 @@ Thumbs.db
 # não do projeto. Se quiser versioná-los, remova estas duas linhas.
 dbt/AGENTS.md
 dbt/manual_fixes/
+PROCESSO.md
+APRESENTACAO.md
+dbt/analytics.duckdb
+docs/ESTRUTURA.md
+docs/resumo-e-glossario.md
+data/analytics.duckdb

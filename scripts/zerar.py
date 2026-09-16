@@ -53,7 +53,12 @@ def em_uso(caminho: Path) -> str | None:
 def levantar():
     """Lista o que existe hoje, sem apagar nada."""
     alvos = []
-    for camada in CAMADAS:
+    # Bronze é Delta Lake: cada tabela é uma PASTA (com _delta_log/).
+    for p in sorted((RAIZ / "data" / "bronze").iterdir() if (RAIZ / "data" / "bronze").exists() else []):
+        if p.is_dir():
+            alvos.append(p)
+    # Silver e Gold são arquivos Parquet soltos.
+    for camada in ["silver", "gold"]:
         for p in sorted((RAIZ / "data" / camada).glob("*.parquet")):
             alvos.append(p)
     if CATALOGO.exists():
@@ -116,7 +121,7 @@ def main():
 
     print(f"\nPronto. {len(alvos)} item(ns) apagado(s).")
     print("\nAs três camadas estão vazias. Para reconstruir ao vivo:")
-    print("    python -m src.pipeline          # Bronze: 122, 8, 7, 408")
+    print("    python -m src.pipeline          # Bronze (Delta): taxas 5573, ufs 28")
     print("    cd dbt && dbt build && cd ..    # Silver + Gold + testes")
 
 

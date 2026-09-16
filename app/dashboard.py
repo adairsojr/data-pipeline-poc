@@ -1,10 +1,10 @@
-"""Dashboard da Central de Serviços — o CONSUMO da camada Gold.
+"""Dashboard da evasão escolar (INEP) — o CONSUMO da camada Gold.
 
 Este é o último elo da jornada: Fontes -> Bronze -> Silver -> Gold -> AQUI.
 
 Repare no que este dashboard NÃO faz:
     - não limpa dado (a Silver já limpou);
-    - não calcula a medida (a Gold já derivou tempo_atendimento_dias);
+    - não calcula a métrica (a Gold já derivou abandono_combinado);
     - não decide regra de negócio (as decisões estão no pipeline,
       documentadas e testadas).
 Quem consome a Gold apenas FILTRA e AGRUPA. É por isso que qualquer
@@ -20,127 +20,103 @@ from pathlib import Path
 import duckdb
 import streamlit as st
 
-# ---------------------------------------------------------------------
-# Onde está a Gold: ARQUIVOS Parquet. Sem servidor de banco.
-# O DuckDB (motor OLAP embutido) consulta os arquivos direto do disco —
-# a mesma separação storage × engine da aula.
-# ---------------------------------------------------------------------
 RAIZ = Path(__file__).resolve().parent.parent
 GOLD = RAIZ / "data" / "gold"
 
-st.set_page_config(page_title="Central de Serviços", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Evasão escolar (INEP)", page_icon="🎓", layout="wide")
 
 
-@st.cache_data  # cache: os Parquet só são relidos se mudarem de verdade
+@st.cache_data
 def carregar():
     con = duckdb.connect()
-    fato = con.sql(f"select * from '{GOLD}/fato_chamado.parquet'").df()
-    unidades = con.sql(f"select * from '{GOLD}/dim_unidade.parquet'").df()
-    categorias = con.sql(f"select * from '{GOLD}/dim_categoria.parquet'").df()
-    return fato, unidades, categorias
+    fato = con.sql(f"select * from '{GOLD}/fato_taxa.parquet'").df()
+    ufs = con.sql(f"select * from '{GOLD}/dim_uf.parquet'").df()
+    return fato, ufs
 
 
-if not (GOLD / "fato_chamado.parquet").exists():
-    st.error("Gold não encontrada. Rode antes:  python -m src.pipeline  e  dbt run")
+if not (GOLD / "fato_taxa.parquet").exists():
+    st.error("Gold não encontrada. Rode antes:  python -m src.pipeline  e  dbt build")
     st.stop()
 
-fato, unidades, categorias = carregar()
+fato, ufs = carregar()
 
-# ---------------------------------------------------------------------
-# O STAR SCHEMA em ação: o join fato × dimensões acontece AQUI,
-# no consumo — exatamente como desenhado na aula.
-# ---------------------------------------------------------------------
-df = (
-    fato.merge(unidades, on="unidade_sk")
-        .merge(categorias, on="categoria_sk")
-)
-# a SK de data é a "smart key" AAAAMMDD — o ano é os 4 primeiros
-# dígitos, sem precisar de join com a dim_tempo
-df["ano"] = df["data_abertura_sk"] // 10000
+# O STAR SCHEMA em ação: o join fato x dimensão acontece AQUI, no consumo.
+df = fato.merge(ufs, on="uf_sk")
 
 # ---------------------------- filtros --------------------------------
 st.sidebar.header("Filtros (as dimensões!)")
-f_unidade = st.sidebar.multiselect("Unidade", sorted(df["nome_unidade"].unique()))
-f_categoria = st.sidebar.multiselect("Categoria", sorted(df["nome_categoria"].unique()))
-f_ano = st.sidebar.multiselect("Ano (abertura)", sorted(df["ano"].unique()))
+f_regiao = st.sidebar.multiselect("Região", sorted(df["regiao"].unique()))
+f_uf = st.sidebar.multiselect("UF", sorted(df["uf"].unique()))
 
-st.sidebar.caption(
-    "Cada filtro é uma dimensão do cubo da aula: "
-    "**unidade · categoria · período**."
-)
+#st.sidebar.caption("Cada filtro é uma dimensão do cubo: **região · UF**.")
 
-if f_unidade:
-    df = df[df["nome_unidade"].isin(f_unidade)]
-if f_categoria:
-    df = df[df["nome_categoria"].isin(f_categoria)]
-if f_ano:
-    df = df[df["ano"].isin(f_ano)]
+if f_regiao:
+    df = df[df["regiao"].isin(f_regiao)]
+if f_uf:
+    df = df[df["uf"].isin(f_uf)]
 
-# a medida só existe para chamados resolvidos com datas plausíveis —
-# a decisão foi tomada na fato_chamado, NÃO aqui
-resolvidos = df.dropna(subset=["tempo_atendimento_dias"])
+# a métrica derivada só existe para municípios com taxa válida — a decisão
+# foi tomada na fato_taxa, NÃO aqui
+validos = df.dropna(subset=["abandono_combinado"])
 
 # ------------------------------ KPIs ---------------------------------
-st.title("📊 Central de Serviços — tempo de atendimento")
-st.caption("Fonte: camada Gold (Parquet) · medida derivada e testada no pipeline dbt")
+st.title("Evasão escolar por município — INEP 2023")
+#st.caption("Fonte: camada Gold (Parquet) · métrica derivada e testada no pipeline dbt")
 
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Chamados (total)", len(df))
-c2.metric("Resolvidos com medida", len(resolvidos))
-c3.metric("Em andamento", int((df["situacao"] == "Em andamento").sum()))
-c4.metric(
-    "Tempo médio (dias)",
-    # ⚠ pt-BR usa VÍRGULA como separador decimal. O Python formata com
-    # ponto; a troca é manual porque não há locale garantido na máquina.
-    f"{resolvidos['tempo_atendimento_dias'].mean():.1f}".replace(".", ",")
-    if len(resolvidos) else "—",
+c1, c2, c3 = st.columns(3)
+c1.metric("Municípios", len(df))
+c2.metric(
+    "Evasão média (%)",
+    f"{validos['abandono_combinado'].mean():.2f}".replace(".", ",")
+    if len(validos) else "—",
+)
+c3.metric(
+    "Evasão máxima (%)",
+    f"{validos['abandono_combinado'].max():.2f}".replace(".", ",")
+    if len(validos) else "—",
 )
 
 # ----------------------------- gráficos ------------------------------
 col_a, col_b = st.columns(2)
 
 with col_a:
-    st.subheader("Ranking por unidade")
-    ranking = (
-        resolvidos.groupby("nome_unidade")["tempo_atendimento_dias"]
-        .mean().round(1).sort_values(ascending=False)
+    st.subheader("Evasão média por região")
+    por_regiao = (
+        validos.groupby("regiao")["abandono_combinado"]
+        .mean().round(2).sort_values(ascending=False)
     )
-    st.bar_chart(ranking)
+    st.bar_chart(por_regiao)
 
 with col_b:
-    st.subheader("Evolução por ano de abertura")
-    # ⚠ o ano vira TEXTO antes de agrupar. Se ficar como inteiro, o
-    # Streamlit o trata como número e escreve "2,023" no eixo, com
-    # separador de milhar. Ano é rótulo, não quantidade.
-    evolucao = (
-        resolvidos.assign(ano=resolvidos["ano"].astype(str))
-        .groupby("ano")["tempo_atendimento_dias"]
-        .mean().round(1)
+    st.subheader("Evasão média por UF")
+    por_uf = (
+        validos.groupby("uf")["abandono_combinado"]
+        .mean().round(2).sort_values(ascending=False)
     )
-    st.line_chart(evolucao)
+    st.bar_chart(por_uf)
 
-st.subheader("Por categoria")
-por_categoria = (
-    resolvidos.groupby("nome_categoria")["tempo_atendimento_dias"]
-    .agg(chamados="count", tempo_medio_dias="mean").round(1)
-    .sort_values("tempo_medio_dias", ascending=False)
+st.subheader("Fundamental x Médio (evasão média por região)")
+etapas = (
+    validos.groupby("regiao")
+    .agg(
+        fundamental=("taxa_abandono_fund", "mean"),
+        medio=("taxa_abandono_med", "mean"),
+    )
 )
-# O Styler do pandas formata em pt-BR sem converter para texto: a coluna
-# continua numérica (alinhada à direita e ordenável), só a EXIBIÇÃO muda.
-st.dataframe(
-    por_categoria.style.format(
-        {"chamados": "{:.0f}", "tempo_medio_dias": "{:.1f}"},
-        decimal=",",
-        thousands=".",
-    ),
-    use_container_width=True,
+# média das duas colunas por região
+etapas = (
+    validos.groupby("regiao")[["taxa_abandono_fund", "taxa_abandono_med"]]
+    .mean().round(2)
+    .rename(columns={"taxa_abandono_fund": "Fundamental", "taxa_abandono_med": "Médio"})
+    .sort_values("Médio", ascending=False)
 )
+st.bar_chart(etapas)
 
 # ------------------------- rodapé didático ---------------------------
 st.divider()
-st.caption(
-    "⚙️ Este dashboard tem ZERO regra de negócio: os nulos, os tempos "
-    "negativos e a unidade inexistente foram decididos no pipeline — "
-    "uma vez, para todos. Troque este Streamlit por Power BI ou Metabase "
-    "e o número será o mesmo. **Essa é a função da Gold.**"
-)
+#st.caption(
+#    "⚙️ Este dashboard tem ZERO regra de negócio: a vírgula decimal, a UF "
+#    "órfã e a taxa implausível foram decididas no pipeline — uma vez, para "
+#    "todos. Troque este Streamlit por Power BI ou Metabase e o número será "
+#    "o mesmo. **Essa é a função da Gold.**"
+#)

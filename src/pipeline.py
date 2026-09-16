@@ -5,6 +5,10 @@ uma SEQUÊNCIA DE ETAPAS COM DEPENDÊNCIAS. Orquestradores profissionais
 (Airflow, Dagster...) resolvem agendamento, retries e paralelismo —
 mas o conceito é este aqui.
 
+Cada execução regrava as tabelas Delta do Bronze, gerando uma nova
+versão (time travel). O pipeline é REPROCESSÁVEL: roda do zero, a
+partir das fontes em data/raw/, quantas vezes quiser.
+
 Execução:  python -m src.pipeline
 """
 
@@ -25,16 +29,14 @@ def main() -> None:
     logger.info("Iniciando pipeline de ingestão")
 
     etapas = [
-        ingest.ingest_chamados,
-        ingest.ingest_unidades,
-        ingest.ingest_categorias,
-        ingest.ingest_interacoes,
+        ingest.ingest_taxas,
+        ingest.ingest_ufs,
     ]
 
     for etapa in etapas:
         etapa()
 
-    logger.info("Ingestão concluída. Bronze disponível em data/bronze/")
+    logger.info("Ingestão concluída. Bronze (Delta) disponível em data/bronze/")
 
 
 if __name__ == "__main__":

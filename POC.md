@@ -1,129 +1,115 @@
 # Roteiro de leitura da PoC
 
-Este projeto está **completo e comentado**. Ele não é um exercício: é um pipeline funcionando, escrito para ser **lido e explicado**.
+Este projeto está **completo e comentado**. Ele não é um exercício: é um pipeline
+funcionando, escrito para ser **lido e explicado**.
 
-Cada arquivo traz comentários que respondem três perguntas: *o que este código faz*, *qual problema ele resolve* e *que conceito ele materializa*.
+Cada arquivo traz comentários que respondem três perguntas: *o que este código faz*,
+*qual problema ele resolve* e *que conceito ele materializa*.
 
-> **A pergunta que move tudo:** qual é o tempo médio de atendimento por unidade, categoria e período?
+> **As perguntas que movem tudo:**
+> 1. taxa média de evasão escolar por **região** e por **UF**;
+> 2. a evasão é maior no **Fundamental** ou no **Médio**, e como varia por região.
 
 ---
 
 ## Executando (5 minutos)
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate     # ou: conda create -n poc python=3.12
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 cp .env.example .env
 
-python -m src.pipeline        # Fontes -> Bronze
+python -m src.pipeline        # Fontes -> Bronze (Delta Lake)
 cd dbt && dbt deps            # baixa o pacote dbt_utils (1ª vez)
-dbt run                       # Bronze -> Silver -> Gold
-dbt test                      # 29 testes (1 falha de proposito: unidade 99)
+dbt build                     # Bronze -> Silver -> Gold + testes
 ```
 
 O que esperar:
 
 | Comando | Resultado |
 |---|---|
-| `python -m src.pipeline` | 4 Parquet em `data/bronze/` (122, 8, 7 e 408 registros) |
-| `dbt run` | 8 modelos: 4 Silver + 4 Gold, gravados como Parquet |
-| `dbt test` | **20 passed** |
+| `python -m src.pipeline` | 2 tabelas Delta em `data/bronze/` (taxas: 5573, ufs: 28) |
+| `dbt build` | **PASS=20** (4 modelos + 16 testes) |
 | `pytest` | **5 passed** |
 
 ---
 
 ## A ordem de leitura
 
-Siga esta sequência — ela é a própria jornada do dado.
-
 ### 1. As fontes · `data/raw/`
 
-Três CSVs e um JSON, como se tivessem sido exportados de sistemas diferentes da Central de Serviços. **Contêm problemas de propósito**: datas em dois formatos, duplicatas, identificador vazio, unidade inexistente, grafias inconsistentes.
+Um CSV e um JSON, como se tivessem sido exportados do sistema do INEP.
+**Contêm problemas de propósito** (lista em [`docs/anomalias-das-fontes.md`](docs/anomalias-das-fontes.md)).
 
-| Arquivo | Registros | **Grão** (o que é uma linha) | Vira |
+| Arquivo | Formato | **Grão** | Vira |
 |---|---|---|---|
-| `chamados.csv` | 122 | um chamado | a tabela fato |
-| `unidades.csv` | 8 | uma unidade de atendimento | dimensão |
-| `categorias.csv` | 7 | uma categoria (mas são só **6** — o id 2 repete) | dimensão |
-| `interacoes.json` | 408 | um **evento** dentro de um chamado | não entra na fato ⚠ |
+| `taxas_municipios.csv` | CSV | um município (taxas 2023) | a tabela fato |
+| `ufs.json` | JSON | uma UF (sigla → região) | dimensão |
 
-Repare no grão: três arquivos descrevem *entidades*, um descreve *eventos*. É essa diferença que causa o fan-out mais adiante.
-
-*Pergunta para a turma:* "os dados estão todos aqui. Já conseguimos responder a pergunta?" — não: o **tempo de atendimento não existe em coluna nenhuma**. Ele precisa ser derivado de duas datas, e alguém vai ter que decidir como.
+*Pergunta para a turma:* "os dados estão todos aqui. Já conseguimos responder?" —
+não: a **evasão combinada não existe em coluna nenhuma**. O INEP dá o abandono do
+Fundamental e do Médio separados; combiná-los é decisão do pipeline.
 
 ### 2. A ingestão · `src/ingest.py`
 
-Lê cada fonte e grava Parquet no Bronze. Repare em duas decisões comentadas no código:
+Lê cada fonte e grava uma **tabela Delta** no Bronze. Duas decisões comentadas:
 
-- **tudo é lido como texto** (`dtype=str`) — tipar é interpretar, e interpretar é transformar (papel da Silver);
-- **compare `ingest_chamados` (CSV) com `ingest_interacoes` (JSON)** — muda o leitor, não muda o destino. É a ingestão absorvendo a diversidade das fontes.
+- **tudo é lido como texto** (`dtype=str`) — tipar é interpretar (papel da Silver);
+- **compare `ingest_taxas` (CSV) com `ingest_ufs` (JSON)** — muda o leitor, não muda
+  o destino. É a ingestão absorvendo a diversidade das fontes.
 
-`src/pipeline.py` é o orquestrador: 15 linhas mostrando que um pipeline é, antes de tudo, uma sequência de etapas com dependências.
+### 3. O Bronze · `data/bronze/` (Delta Lake)
 
-### 3. O Bronze · `data/bronze/`
-
-O que o pipeline capturou, preservado. **Mudou o formato, não o conteúdo** — as duplicatas e as datas malformadas continuam todas lá.
-
-Para olhar dentro de um Parquet (que é binário):
+O que o pipeline capturou, preservado. **Mudou o formato, não o conteúdo** — os
+defeitos continuam lá. Cada carga gera uma **versão** (time travel):
 
 ```bash
-python -c "import duckdb; print(duckdb.sql(\"select * from 'data/bronze/chamados.parquet' limit 5\"))"
+python scripts/time_travel.py    # cria a v1 (correção da taxa > 100) e compara v0 x v1
 ```
-
-*Repare no `FROM`:* no lugar do nome da tabela, um **caminho de arquivo**. Nenhum servidor, nenhum import — armazenamento e processamento separados.
 
 ### 4. A Silver · `dbt/models/silver/`
 
-Onde o dado vira **confiável**. Leia nesta ordem:
-
 | Modelo | O que demonstra |
 |---|---|
-| `stg_chamados.sql` | tipagem, deduplicação e o tratamento dos **dois formatos de data** |
-| `stg_unidades.sql` | padronização de texto ("dourados", "TRÊS LAGOAS", "&nbsp;&nbsp;Aquidauana", "Naviraí&nbsp;") |
-| `stg_categorias.sql` | deduplicação que exige uma **decisão de negócio** — qual grafia é a oficial? |
-| `stg_interacoes.sql` | o dado que veio de JSON, tratado igual aos de CSV |
-
-O `stg_categorias.sql` é o mais interessante para discutir: o SQL escolhe uma grafia, mas quem *deveria* escolher é o dono do dado. É governança aparecendo dentro de um modelo dbt.
+| `stg_taxas.sql` | tipagem, deduplicação, **vírgula→ponto** nas taxas, padronização de UF |
+| `stg_ufs.sql` | deduplicação que exige uma **decisão de negócio** — qual grafia da região é a oficial? |
 
 ### 5. A Gold · `dbt/models/gold/`
 
-Onde o dado ganha **forma** para responder à pergunta.
-
 | Modelo | O que demonstra |
 |---|---|
-| `fato_chamado.sql` | grão, medida derivada, dimensão degenerada, decisões de negócio explícitas |
-| `dim_unidade.sql` | dimensão conformada, **surrogate key** (hash) + nota sobre SCD |
-| `dim_categoria.sql` | como um problema não tratado na Silver contaminaria a Gold |
-| `dim_tempo.sql` | dimensão gerada (não vem de fonte nenhuma), smart key AAAAMMDD e role-playing |
+| `fato_taxa.sql` | grão (município), **métrica derivada** `abandono_combinado`, dimensões degeneradas, tratamento da taxa >100 |
+| `dim_uf.sql` | dimensão conformada UF→região, **surrogate key** (hash) + nota sobre SCD |
 
-O `fato_chamado.sql` é o coração: leia os comentários da medida `tempo_atendimento_dias` — eles explicam por que chamados em andamento ficam nulos, por que tempo negativo é descartado, e por que a medida é guardada **por chamado** em vez de já agregada.
+O `fato_taxa.sql` é o coração: os comentários da métrica `abandono_combinado`
+explicam por que a evasão do Fundamental e do Médio é combinada aqui (não existe
+pronta) e por que a taxa implausível é neutralizada.
 
 ### 6. Os testes · `schema.yml` e `tests/`
 
-- `dbt/models/*/schema.yml` — qualidade de dados como código executável
-- `tests/test_ingestion.py` — testes do **código** da ingestão
+- `dbt/models/*/schema.yml` — qualidade de dados como código (16 testes, 4 tipos)
+- `tests/test_ingestion.py` — testes do **código** da ingestão (pytest)
 
-O teste `relationships` (em `gold/schema.yml`) é o mais didático: em Parquet **não existe chave estrangeira**, então a integridade referencial vira verificação. A FK *impedia*; o teste apenas *detecta*.
-
-Para ver o SQL que um teste vira:
-
-```bash
-cat dbt/target/compiled/central_servicos/models/silver/schema.yml/not_null_stg_chamados_chamado_id.sql
-```
+O teste `relationships` é o mais didático: em Delta/Parquet **não existe chave
+estrangeira**, então a integridade referencial (a UF órfã `ZZ`) vira verificação.
 
 ### 7. O consumo · `consultas/analise.sql`
 
-Sete consultas comentadas: a pergunta oficial, o ranking por unidade, a evolução por ano, a análise por equipe — mais **três armadilhas** para demonstrar ao vivo (o `group by equipe_id` sozinho, o fan-out ao misturar grãos, e o efeito de um único registro implausível sobre o ranking).
+As duas perguntas, com **zero regra de negócio no WHERE**:
+
+```bash
+python scripts/rodar_bloco.py analise 1     # Pergunta 1 (região × UF)
+python scripts/rodar_bloco.py analise 2     # Pergunta 2 (fundamental × médio)
+```
 
 ### 8. O dashboard · `app/dashboard.py`
-
-O consumo com rosto de produto: um painel Streamlit sobre a Gold, com os filtros sendo exatamente as três dimensões (unidade · categoria · período).
 
 ```bash
 streamlit run app/dashboard.py
 ```
 
-Repare no código: **zero regra de negócio** — nulos, tempos negativos e a unidade inexistente foram decididos no pipeline. Trocar o Streamlit por Power BI ou Metabase produziria o mesmo número. Essa é a função da Gold.
+Zero regra de negócio: as decisões foram tomadas no pipeline. Trocar o Streamlit por
+Power BI produziria o mesmo número. Essa é a função da Gold.
 
 ### 9. O lineage
 
@@ -131,7 +117,7 @@ Repare no código: **zero regra de negócio** — nulos, tempos negativos e a un
 cd dbt && dbt docs generate && dbt docs serve
 ```
 
-A DAG do projeto no navegador, com a documentação que nasceu dos mesmos `schema.yml` que declaram os testes.
+A DAG do projeto no navegador, com a documentação que nasceu dos mesmos `schema.yml`.
 
 ---
 
@@ -139,22 +125,6 @@ A DAG do projeto no navegador, com a documentação que nasceu dos mesmos `schem
 
 | Documento | Conteúdo |
 |---|---|
-| [`docs/architecture.md`](docs/architecture.md) | as camadas, as decisões de arquitetura e **as 5 etapas do `dbt run`** |
-| [`docs/comparacao-oltp-vs-gold.md`](docs/comparacao-oltp-vs-gold.md) | a mesma pergunta no OLTP (5 tabelas, 4 joins, 1 CTE) e na Gold (2 arquivos, 1 join) |
-| [`scripts/criar_oltp_simulado.py`](scripts/criar_oltp_simulado.py) | monta um sistema de chamados normalizado para demonstrar a comparação acima ao vivo |
-
----
-
-## Demonstrações ao vivo
-
-**Um teste falhando.** Comente o `coalesce` da `data_abertura` em `stg_chamados.sql` (deixando só o `try_cast`) e rode `dbt run && dbt test`. Duas datas em `DD/MM/AAAA` viram NULL e o teste `not_null` acusa. Mostra que **dado ruim quebra uma regra executável**.
-
-**O slide dos 4 analistas, ao vivo.** `python scripts/criar_oltp_simulado.py` (gera `data/chamados_oltp.duckdb`) e depois `python scripts/rodar_bloco.py 3` — as quatro versões da mesma pergunta (10,8 · 11,2 · 11,3 · 10,5), cada uma mudando UMA decisão. Arquivo comentado: `consultas/oltp_quatro_analistas.sql`.
-
-**A DAG se resolvendo sozinha.** `dbt run --select +fato_chamado` — o dbt constrói `stg_chamados` e `stg_unidades` antes, sem que ninguém tenha escrito essa ordem.
-
-**O fan-out.** A consulta 6 de `consultas/analise.sql`: a média salta de **10,8 para 15,2 dias** (118 → 395 linhas) só por juntar tabelas de grãos diferentes. Sobe porque chamado demorado acumula mais interações — e passa a pesar mais.
-
-**Um registro ruim muda o ranking.** A consulta 7: sem excluir o único chamado com fechamento anterior à abertura, Ponta Porã cai de 13,3 para 10,9 e **troca de posição com Três Lagoas**. Nenhum erro é acusado.
-
-**Storage × engine.** Apague `data/gold/dim_unidade.parquet` e tente consultar a Gold: erro. Prova que o dado mora no arquivo, e o DuckDB apenas sabe o endereço.
+| [`DECISOES.md`](DECISOES.md) | as 4 decisões (arquitetura, grão, dado ambíguo, registro inválido) |
+| [`docs/architecture.md`](docs/architecture.md) | as camadas e as 5 etapas do `dbt build` |
+| [`docs/anomalias-das-fontes.md`](docs/anomalias-das-fontes.md) | os defeitos plantados e onde cada um é tratado |

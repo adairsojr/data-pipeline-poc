@@ -3,111 +3,48 @@ version: 2
 # =====================================================================
 # TESTES DA CAMADA GOLD
 # =====================================================================
-# Aqui aparece o teste mais interessante do projeto: `relationships`.
-#
-# Em um banco relacional, a integridade entre fato e dimensão seria
-# garantida por uma CHAVE ESTRANGEIRA — o banco IMPEDIRIA a gravação
-# inválida. Em arquivos Parquet não existe FK.
-#
-# A integridade vira então uma VERIFICAÇÃO: o teste procura órfãos
-# (registros do fato apontando para dimensão inexistente).
-#
-# ⚠ A palavra importa: a FK IMPEDIA; o teste apenas DETECTA.
-# É a Era 2 da aula anterior — o lake ganhou flexibilidade e perdeu
-# garantias nativas.
+# Protegem o MODELO DIMENSIONAL:
+# - unique/not_null nas surrogate keys da dimensão e no grão da fato;
+# - relationships entre a fato e a dimensão (a "chave estrangeira" que o
+#   Delta/Parquet não tem, virando teste).
 # =====================================================================
 
 models:
-  - name: fato_chamado
+  - name: fato_taxa
     description: >
-      Tabela fato no grão de chamado (uma linha = um chamado).
-      Contém a medida tempo_atendimento_dias e as chaves para as
-      dimensões unidade, categoria e tempo.
+      Fato no grão de UM município (2023). Contém a FK uf_sk, dimensões
+      degeneradas (código/nome do município, ano), as taxas de origem e a
+      métrica derivada abandono_combinado.
     columns:
-      - name: chamado_id
-        description: >
-          Identificador de negócio do chamado (dimensão degenerada).
-          É também a identidade da linha: a fato NÃO tem surrogate key
-          própria, porque o grão é um chamado por linha e esta coluna
-          já é única e legível.
+      - name: codigo_municipio
+        description: Código IBGE do município (dimensão degenerada).
         tests:
           - not_null
-          - unique     # garante o GRÃO: um chamado não pode repetir
-      - name: unidade_sk
-        description: Chave para dim_unidade.
+          - unique        # garante o GRÃO da fato
+      - name: uf_sk
+        description: FK para dim_uf.
         tests:
-          # o "FK que não existe": procura chamados apontando para
-          # unidade inexistente. Passa porque o modelo já filtra —
-          # mas o teste continua vigiando cargas futuras.
-          #
-          # Repare que agora ele confere HASH contra HASH: prova que a
-          # SK calculada na fato bate com a SK calculada na dimensão.
+          # INTEGRIDADE REFERENCIAL sem FK: todo uf_sk da fato tem de
+          # existir em dim_uf. É este teste que "fecha" o tratamento do
+          # DEFEITO 3 (UF órfã 'ZZ').
+          - not_null
           - relationships:
               arguments:
-                to: ref('dim_unidade')
-                field: unidade_sk
-      - name: categoria_sk
-        description: Chave para dim_categoria.
-        tests:
-          - relationships:
-              arguments:
-                to: ref('dim_categoria')
-                field: categoria_sk
-      - name: data_abertura_sk
-        description: Papel "abertura" da dim_tempo (smart key AAAAMMDD).
-        tests:
-          # ROLE-PLAYING testado: cada papel tem seu próprio teste
-          # contra a MESMA dimensão de calendário.
-          - relationships:
-              arguments:
-                to: ref('dim_tempo')
-                field: data_sk
-      - name: data_fechamento_sk
-        description: >
-          Papel "fechamento" da dim_tempo. NULA para chamado em
-          andamento — o teste relationships ignora nulos, então só
-          confere as datas que existem.
-        tests:
-          - relationships:
-              arguments:
-                to: ref('dim_tempo')
-                field: data_sk
+                to: ref('dim_uf')
+                field: uf_sk
 
-  - name: dim_unidade
-    description: Dimensão conformada de unidade de atendimento.
+  - name: dim_uf
+    description: Dimensão de UF -> região.
     columns:
-      - name: unidade_sk
-        description: Surrogate key (hash da chave de negócio).
-        tests:
-          - not_null
-          - unique     # dimensão com chave duplicada causaria fan-out
-      - name: unidade_id
-        description: Chave de negócio (vinda da origem).
-        tests:
-          - not_null
-          - unique     # 1 versão por unidade (sem SCD2, id também é único)
-
-  - name: dim_categoria
-    description: Dimensão conformada de categoria de chamado.
-    columns:
-      - name: categoria_sk
+      - name: uf_sk
         tests:
           - not_null
           - unique
-      - name: categoria_id
+      - name: uf
         tests:
-          - not_null
           - unique
-
-  - name: dim_tempo
-    description: Dimensão de calendário, gerada pelo pipeline.
-    columns:
-      - name: data_sk
-        description: Smart key AAAAMMDD (a exceção aceita pelo Kimball).
+      - name: regiao
         tests:
-          - not_null
-          - unique
-      - name: data
-        tests:
-          - not_null
-          - unique
+          - accepted_values:
+              arguments:
+                values: ["Norte", "Nordeste", "Sudeste", "Sul", "Centro-Oeste"]

@@ -1,0 +1,114 @@
+[
+  {
+    "uf": "AC",
+    "regiao": "Norte"
+  },
+  {
+    "uf": "AL",
+    "regiao": "Nordeste"
+  },
+  {
+    "uf": "AM",
+    "regiao": "Norte"
+  },
+  {
+    "uf": "AP",
+    "regiao": "Norte"
+  },
+  {
+    "uf": "BA",
+    "regiao": "Nordeste"
+  },
+  {
+    "uf": "CE",
+    "regiao": "Nordeste"
+  },
+  {
+    "uf": "DF",
+    "regiao": "Centro-Oeste"
+  },
+  {
+    "uf": "ES",
+    "regiao": "Sudeste"
+  },
+  {
+    "uf": "GO",
+    "regiao": "Centro-Oeste"
+  },
+  {
+    "uf": "MA",
+    "regiao": "Nordeste"
+  },
+  {
+    "uf": "MG",
+    "regiao": "Sudeste"
+  },
+  {
+    "uf": "MS",
+    "regiao": "Centro-Oeste"
+  },
+  {
+    "uf": "MT",
+    "regiao": "Centro-Oeste"
+  },
+  {
+    "uf": "PA",
+    "regiao": "Norte"
+  },
+  {
+    "uf": "PB",
+    "regiao": "Nordeste"
+  },
+  {
+    "uf": "PE",
+    "regiao": "Nordeste"
+  },
+  {
+    "uf": "PI",
+    "regiao": "Nordeste"
+  },
+  {
+    "uf": "PR",
+    "regiao": "Sul"
+  },
+  {
+    "uf": "RJ",
+    "regiao": "Sudeste"
+  },
+  {
+    "uf": "RN",
+    "regiao": "Nordeste"
+  },
+  {
+    "uf": "RO",
+    "regiao": "Norte"
+  },
+  {
+    "uf": "RR",
+    "regiao": "Norte"
+  },
+  {
+    "uf": "RS",
+    "regiao": "Sul"
+  },
+  {
+    "uf": "SC",
+    "regiao": "Sul"
+  },
+  {
+    "uf": "SE",
+    "regiao": "Nordeste"
+  },
+  {
+    "uf": "SP",
+    "regiao": "Sudeste"
+  },
+  {
+    "uf": "TO",
+    "regiao": "Norte"
+  },
+  {
+    "uf": "AC",
+    "regiao": "NORTE"
+  }
+]

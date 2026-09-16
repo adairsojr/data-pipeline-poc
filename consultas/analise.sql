@@ -1,158 +1,67 @@
 -- =====================================================================
--- CONSULTAS DE ANÁLISE — o CONSUMO da camada Gold
+-- CONSULTAS DE ANÁLISE — o CONSUMO da camada Gold (INEP · evasão escolar)
 -- =====================================================================
--- Execute da raiz do projeto:
---   python -c "import duckdb; print(duckdb.sql(open('consultas/analise.sql').read()))"
+-- Execute um bloco por vez, da raiz do projeto:
+--   python scripts/rodar_bloco.py analise 1
+--   python scripts/rodar_bloco.py analise 2
 --
--- (o DuckDB executa a ÚLTIMA instrução do arquivo — descomente uma por vez)
---
--- Repare em todas elas: NENHUMA regra de negócio. A medida já existe,
--- as decisões já foram tomadas no pipeline. Quem consulta apenas agrupa.
+-- Repare em TODAS as consultas: NENHUMA regra de negócio no WHERE.
+-- A métrica derivada (abandono_combinado) já foi calculada e as decisões
+-- (taxa >100, UF órfã, sem código) já foram tomadas no pipeline. Quem
+-- consulta apenas JUNTA e AGRUPA — por isso qualquer ferramenta (SQL,
+-- Power BI, Metabase) chega ao MESMO número.
 -- =====================================================================
 
 
 -- =====================================================================
--- 1) A PERGUNTA OFICIAL DA POC
---    "tempo médio de atendimento por unidade, categoria e período"
+-- 1) PERGUNTA 1 — evasão média por REGIÃO e por UF
+--   "Qual é a taxa média de evasão escolar (abandono) dos municípios,
+--    por REGIÃO e por UF?"
+--
+--   • métrica DERIVADA: abandono_combinado (média do abandono do
+--     Fundamental e do Médio — não existe pronta na fonte, é calculada
+--     na fato_taxa);
+--   • 2 recortes: por REGIÃO e por UF (hierarquia geográfica).
 -- =====================================================================
--- 4 arquivos, 3 joins — o star schema em ação: a fato no centro,
--- as três dimensões dando contexto.
+-- O star schema em ação: a fato no centro, a dim_uf dando o contexto
+-- geográfico. O join usa a SURROGATE KEY.
 select
-    u.nome_unidade,
-    c.nome_categoria,
-    t.ano,
-    count(*)                                   as chamados_resolvidos,
-    round(avg(f.tempo_atendimento_dias), 1)    as tempo_medio_dias
--- Os joins agora usam as SURROGATE KEYS — a fato não carrega mais as
--- chaves de negócio das dimensões (elas viraram atributos das dims).
-from 'data/gold/fato_chamado.parquet' f
-join 'data/gold/dim_unidade.parquet'   u on f.unidade_sk   = u.unidade_sk
-join 'data/gold/dim_categoria.parquet' c on f.categoria_sk = c.categoria_sk
--- ROLE-PLAYING: aqui dim_tempo está no papel de "data de abertura".
--- Trocar para f.data_fechamento_sk responderia outra pergunta: chamados
--- FECHADOS no ano, em vez de ABERTOS no ano.
-join 'data/gold/dim_tempo.parquet'     t on f.data_abertura_sk = t.data_sk
--- exclui os chamados em andamento (medida nula, por decisão do modelo)
-where f.tempo_atendimento_dias is not null
-group by 1, 2, 3
-order by 1, 2, 3;
+    u.regiao,
+    u.uf,
+    count(*)                                 as municipios,
+    round(avg(f.abandono_combinado), 2)      as evasao_media_pct,
+    round(max(f.abandono_combinado), 2)      as evasao_max_pct
+from 'data/gold/fato_taxa.parquet' f
+join 'data/gold/dim_uf.parquet'    u on f.uf_sk = u.uf_sk
+-- NÃO é regra de negócio: só ignora municípios sem métrica (a decisão de
+-- deixá-los nulos foi tomada na Gold). Sem isso, a média nem existe.
+where f.abandono_combinado is not null
+group by 1, 2
+order by u.regiao, evasao_media_pct desc;
 
 
 -- =====================================================================
--- 2) O RANKING QUE O GESTOR QUER VER — por unidade
--- =====================================================================
--- Resultado esperado: Aquidauana 19,9 · Dourados 15,1 · Ponta Porã 13,3
--- · Três Lagoas 11,3 · Naviraí 9,1 · Corumbá 7,8 · Campo Grande 6,8
--- · Coxim 4,8    (média geral: 10,8 dias)
+-- 2) PERGUNTA 2 — onde a evasão é maior: Fundamental x Médio, por região
+--   "Comparando as etapas, a evasão é maior no Ensino FUNDAMENTAL ou no
+--    MÉDIO — e como isso varia por REGIÃO?"
 --
--- select
---     u.nome_unidade,
---     count(*)                                 as chamados_resolvidos,
---     round(avg(f.tempo_atendimento_dias), 1)  as tempo_medio_dias
--- from 'data/gold/fato_chamado.parquet' f
--- join 'data/gold/dim_unidade.parquet' u on f.unidade_sk = u.unidade_sk
--- where f.tempo_atendimento_dias is not null
--- group by 1
--- order by tempo_medio_dias desc;
-
-
+--   • 2 recortes: por ETAPA (fundamental/médio) e por REGIÃO;
+--   • usa as taxas de origem lado a lado, revelando o "gap" entre etapas.
+--   Ajuda o gestor a ver em QUE etapa e em QUE região concentrar política
+--   de permanência escolar.
 -- =====================================================================
--- 3) EVOLUÇÃO NO TEMPO — por unidade e ano
--- =====================================================================
--- select
---     u.nome_unidade,
---     t.ano,
---     count(*)                                 as chamados_resolvidos,
---     round(avg(f.tempo_atendimento_dias), 1)  as tempo_medio_dias
--- from 'data/gold/fato_chamado.parquet' f
--- join 'data/gold/dim_unidade.parquet' u on f.unidade_sk = u.unidade_sk
--- join 'data/gold/dim_tempo.parquet'   t on f.data_abertura_sk = t.data_sk
--- where f.tempo_atendimento_dias is not null
--- group by 1, 2
--- order by 1, 2;
-
-
--- =====================================================================
--- 4) POR EQUIPE — sempre com a unidade!
--- =====================================================================
--- ⚠ equipe_id NÃO é único na organização: a "equipe 2" existe em várias
---   unidades. Agrupar só por equipe_id somaria a equipe 2 de Campo
---   Grande com a de Dourados — um número que não significa nada.
---
---   O HAVING evita médias calculadas sobre 1 ou 2 chamados: uma média
---   de um caso não é uma média.
---
--- select
---     u.nome_unidade,
---     f.equipe_id                              as equipe,
---     count(*)                                 as chamados_resolvidos,
---     round(avg(f.tempo_atendimento_dias), 1)  as tempo_medio_dias
--- from 'data/gold/fato_chamado.parquet' f
--- join 'data/gold/dim_unidade.parquet' u on f.unidade_sk = u.unidade_sk
--- where f.tempo_atendimento_dias is not null
--- group by 1, 2
--- having count(*) >= 3
--- order by tempo_medio_dias desc;
-
-
--- =====================================================================
--- 5) A ARMADILHA — mostre em aula ANTES da consulta 4
--- =====================================================================
--- Olhe a coluna unidades_diferentes: a mesma equipe aparece em várias
--- unidades. É a prova de que agrupar só por equipe_id está errado.
---
--- select
---     equipe_id,
---     count(*)                    as chamados,
---     count(distinct unidade_sk)  as unidades_diferentes
--- from 'data/gold/fato_chamado.parquet'
--- where tempo_atendimento_dias is not null
--- group by 1 order by 1;
-
-
--- =====================================================================
--- 6) FAN-OUT — o erro nº 1 com tabelas fato
--- =====================================================================
--- A fato está no grão de CHAMADO. Ao juntá-la com interações (grão de
--- EVENTO), cada chamado vira várias linhas e a média muda — sem nenhum
--- erro de sintaxe.
---
--- Resultado esperado:  10,8 dias em 118 linhas  ->  15,2 dias em 395.
--- A média sobe 41% porque chamados demorados acumulam mais interações
--- e passam a pesar mais.
---
--- ⚠ Sem filtro de nulo nas duas: o avg() do SQL já ignora nulos sozinho,
---    e assim as CONTAGENS mostram o inchaço de linhas — que é o ponto.
---
--- select count(*) as linhas, round(avg(tempo_atendimento_dias),1) as media
--- from 'data/gold/fato_chamado.parquet';
---
--- select count(*) as linhas, round(avg(f.tempo_atendimento_dias),1) as media
--- from 'data/gold/fato_chamado.parquet' f
--- join 'data/silver/stg_interacoes.parquet' i on i.chamado_id = f.chamado_id;
-
-
--- =====================================================================
--- 7) O EFEITO DE UM ÚNICO REGISTRO RUIM — para a discussão final
--- =====================================================================
--- A coluna da esquerda usa a regra oficial (tempo negativo excluído).
--- A da direita esquece esse cuidado. UM registro implausível derruba
--- Ponta Porã de 13,3 para 10,9 e a faz trocar de posição com Três
--- Lagoas no ranking — sem que nenhuma consulta acuse erro.
---
--- A fato não guarda mais as datas cruas — mas a SMART KEY da data
--- (AAAAMMDD) permite reconstruí-las sem join: é uma das vantagens de
--- uma SK "com significado" na dimensão de tempo.
---
--- select
---     u.nome_unidade,
---     round(avg(f.tempo_atendimento_dias), 1) as regra_oficial,
---     round(avg(case when f.data_fechamento_sk is not null
---                    then date_diff('day',
---                         strptime(cast(f.data_abertura_sk   as varchar), '%Y%m%d'),
---                         strptime(cast(f.data_fechamento_sk as varchar), '%Y%m%d'))
---               end), 1)                      as sem_excluir_negativo
--- from 'data/gold/fato_chamado.parquet' f
--- join 'data/gold/dim_unidade.parquet' u on f.unidade_sk = u.unidade_sk
--- group by 1
--- order by regra_oficial desc;
+select
+    u.regiao,
+    count(*)                                    as municipios,
+    round(avg(f.taxa_abandono_fund), 2)         as evasao_fundamental_pct,
+    round(avg(f.taxa_abandono_med), 2)          as evasao_medio_pct,
+    round(avg(f.taxa_abandono_med)
+        - avg(f.taxa_abandono_fund), 2)         as gap_medio_menos_fund
+from 'data/gold/fato_taxa.parquet' f
+join 'data/gold/dim_uf.parquet'    u on f.uf_sk = u.uf_sk
+-- exclui as taxas implausíveis (>100) que a Gold já marcou; aqui apenas
+-- filtramos o que não é medida válida — não é regra de negócio
+where f.taxa_abandono_fund between 0 and 100
+  and f.taxa_abandono_med  between 0 and 100
+group by 1
+order by evasao_medio_pct desc;

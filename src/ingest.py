@@ -5,15 +5,25 @@ Regras desta camada:
     - Fazer APENAS normalizações técnicas mínimas (nomes de coluna,
       metadado de ingestão). Regra de negócio NÃO entra aqui —
       limpeza, padronização e integração são papel do dbt (Silver).
-    - Persistir em Parquet, preservando o dado o mais próximo
+    - Persistir em DELTA LAKE, preservando o dado o mais próximo
       possível de como ele chegou.
 
-raw    = os arquivos que a origem nos entregou (versionados no repo).
-bronze = o que o NOSSO pipeline capturou e persistiu (gerado ao executar).
+POR QUE DELTA LAKE (e não Parquet solto)?
+    O Bronze é a camada de PRESERVAÇÃO do bruto. Delta acrescenta ao
+    Parquet um LOG DE TRANSAÇÕES (_delta_log/): cada escrita gera uma
+    VERSÃO imutável. Isso dá:
+      - time travel: consultar a tabela "como ela estava" na versão N;
+      - auditoria: quem escreveu o quê, quando (histórico do bruto);
+      - reprocessamento seguro: dá para voltar a uma versão anterior.
+    Usamos a biblioteca `deltalake` (Rust puro, SEM Spark).
 
-CENÁRIO: os quatro arquivos são um "export" do sistema de chamados da
-Central de Serviços — o OLTP. Não temos acesso ao banco: temos o que a
-origem quis nos dar, com os defeitos que ela tinha.
+raw    = os arquivos que a origem (INEP) nos entregou (versionados no repo).
+bronze = o que o NOSSO pipeline capturou e persistiu (tabela Delta).
+
+CENÁRIO: as duas fontes são um "export" dos dados do INEP — o CSV com as
+taxas de rendimento por município (aprovação, reprovação e abandono) e o
+JSON com o cadastro de UF -> região. O ABANDONO é a evasão escolar que a
+PoC quer analisar.
 """
 
 import logging
@@ -22,13 +32,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
+from deltalake import DeltaTable, write_deltalake
 from dotenv import load_dotenv
 
 # ---------------------------------------------------------------------
-# Configuração: vem do .env (que cada pessoa cria a partir do
-# .env.example). Caminhos NÃO ficam hardcoded no código — o mesmo
-# código roda em qualquer máquina; só o .env muda. Em projetos reais,
-# é no .env que entrariam credenciais, hosts de banco, buckets etc.
+# Configuração: vem do .env (criado a partir do .env.example). Caminhos
+# NÃO ficam hardcoded — o mesmo código roda em qualquer máquina; só o
+# .env muda. Em projetos reais, é no .env que entrariam credenciais,
+# hosts de banco, buckets etc.
 # ---------------------------------------------------------------------
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(PROJECT_ROOT / ".env")
@@ -40,81 +51,65 @@ logger = logging.getLogger(__name__)
 
 
 def _gravar_bronze(df: pd.DataFrame, nome: str) -> None:
-    """Acrescenta metadado técnico de ingestão e grava Parquet no Bronze."""
+    """Acrescenta metadado técnico e grava uma tabela DELTA no Bronze.
+
+    mode="overwrite": cada execução do pipeline gera uma NOVA VERSÃO da
+    tabela Delta (o dado é reescrito, mas o histórico de versões é
+    preservado no _delta_log/). É isso que habilita o time travel.
+    """
     df = df.copy()
     df["_ingerido_em"] = datetime.now(timezone.utc).isoformat()
-    DATA_BRONZE_PATH.mkdir(parents=True, exist_ok=True)
-    destino = DATA_BRONZE_PATH / f"{nome}.parquet"
-    df.to_parquet(destino, index=False)
-    logger.info("Bronze gravado: %s (%d registros)", destino.name, len(df))
+    destino = DATA_BRONZE_PATH / nome
+    destino.mkdir(parents=True, exist_ok=True)
+    write_deltalake(str(destino), df, mode="overwrite")
+    versao = DeltaTable(str(destino)).version()
+    logger.info("Bronze (Delta) gravado: %s v%d (%d registros)", nome, versao, len(df))
 
 
-def ingest_chamados() -> None:
-    """Ingestão do CSV de chamados — a fonte central da PoC.
+def ingest_taxas() -> None:
+    """Ingestão do CSV de taxas de rendimento — a fonte central da PoC.
 
-    Um chamado por linha: quando foi aberto, quando foi fechado, de que
-    unidade veio e de que categoria é. É desta tabela que sairá a fato.
+    Uma linha por município: taxas de aprovação, reprovação e abandono
+    (Fundamental) e abandono (Médio). É desta tabela que sairá a fato.
     """
-    origem = DATA_RAW_PATH / "chamados.csv"
+    origem = DATA_RAW_PATH / "taxas_municipios.csv"
     logger.info("Lendo %s", origem.name)
     # dtype=str => tudo chega como texto.
     # Decisão consciente: o Bronze preserva o dado como veio;
-    # tipar é decisão de transformação (Silver/dbt).
-    df = pd.read_csv(origem, dtype=str)
+    # tipar é decisão de transformação (Silver/dbt). As taxas têm defeitos
+    # (vírgula decimal, ">100") que só serão tratados na Silver.
+    df = pd.read_csv(origem, dtype=str).fillna("")
     logger.info("%d registros encontrados", len(df))
-    _gravar_bronze(df, "chamados")
+    _gravar_bronze(df, "taxas")
 
 
-def ingest_unidades() -> None:
-    """Ingestão do CSV de unidades — o cadastro geográfico.
+def ingest_ufs() -> None:
+    """Ingestão do JSON de UFs — o cadastro que dá REGIÃO a cada estado.
 
-    Existe para que `unidade_id = 4` vire "Corumbá" no relatório. Sem ele,
-    o gestor recebe uma tabela de números.
-    """
-    origem = DATA_RAW_PATH / "unidades.csv"
-    logger.info("Lendo %s", origem.name)
-    df = pd.read_csv(origem, dtype=str)
-    logger.info("%d registros encontrados", len(df))
-    _gravar_bronze(df, "unidades")
-
-
-def ingest_categorias() -> None:
-    """Ingestão do CSV de categorias de chamado.
-
-    São 7 linhas para 6 categorias: o `categoria_id = 2` aparece duas
-    vezes, com grafias diferentes. Num banco relacional a chave primária
-    impediria; num CSV não existe chave alguma.
-    """
-    origem = DATA_RAW_PATH / "categorias.csv"
-    logger.info("Lendo %s", origem.name)
-    df = pd.read_csv(origem, dtype=str)
-    logger.info("%d registros encontrados", len(df))
-    _gravar_bronze(df, "categorias")
-
-
-def ingest_interacoes() -> None:
-    """Ingestão do JSON de interações dos chamados.
-
-    Repare no que muda em relação às ingestões de CSV — e no que NÃO muda:
+    Repare no que muda em relação à ingestão do CSV — e no que NÃO muda:
 
     - muda o LEITOR: `read_json` no lugar de `read_csv`, porque a origem
       entrega uma lista de objetos JSON, não linhas separadas por vírgula;
-    - `read_json` infere tipos por conta própria (viraria int, datetime...),
-      então convertemos tudo para texto com `.astype(str)` — mantendo a
-      mesma regra das outras fontes: o Bronze preserva, quem tipa é a Silver;
-    - NÃO muda o destino: sai um Parquet igual aos outros. É por isso que,
-      da Silver em diante, o dbt trata CSV e JSON exatamente do mesmo jeito.
+    - convertemos tudo para texto com `.astype(str)`, mantendo a mesma
+      regra da outra fonte: o Bronze preserva, quem tipa é a Silver;
+    - NÃO muda o destino: sai uma tabela Delta igual à outra. É por isso
+      que, da Silver em diante, o dbt trata CSV e JSON do mesmo jeito.
 
-    Essa é a função da camada de ingestão: absorver a diversidade das fontes
-    e entregar um formato único para o resto do pipeline.
-
-    ⚠ ATENÇÃO AO GRÃO: são 408 interações para 122 chamados — de 1 a 6
-    eventos por chamado. Aqui um chamado NÃO é uma linha. Juntar este
-    arquivo com o de chamados sem pensar multiplica as linhas e corrompe
-    qualquer média (isso se chama FAN-OUT).
+    ⚠ Existe uma UF repetida no JSON (mesma sigla, região em outra
+    grafia). O Bronze preserva as duas linhas — resolver isso é papel
+    da Silver, não da ingestão.
     """
-    origem = DATA_RAW_PATH / "interacoes.json"
+    origem = DATA_RAW_PATH / "ufs.json"
     logger.info("Lendo %s", origem.name)
-    df = pd.read_json(origem).astype(str)
+    df = pd.read_json(origem, dtype=str).astype(str)
     logger.info("%d registros encontrados", len(df))
-    _gravar_bronze(df, "interacoes")
+    _gravar_bronze(df, "ufs")
+
+
+def main() -> None:
+    ingest_taxas()
+    ingest_ufs()
+
+
+if __name__ == "__main__":
+    main()

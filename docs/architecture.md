@@ -3,7 +3,7 @@
 ```mermaid
 flowchart LR
     A[CSV / JSON] --> B[Python / Pandas]
-    B --> C[Bronze / Parquet]
+    B --> C[Bronze / Delta Lake]
     C --> D[dbt + DuckDB]
     D --> E[Silver]
     E --> F[Gold]
@@ -15,11 +15,11 @@ flowchart LR
 
 | Etapa | Papel | Neste projeto |
 |---|---|---|
-| **Fonte** | Onde o dado nasce | `data/raw/` — CSVs e JSON "exportados" dos sistemas da Central de Serviços (o que a origem entregou) |
+| **Fonte** | Onde o dado nasce | `data/raw/` — CSV + JSON "exportados" dos dados do INEP (o que a origem entregou) |
 | **Ingestão** | Trazer o dado para o pipeline | `src/ingest.py` (Pandas) |
-| **Bronze** | Preservar o que chegou, rastreável | `data/bronze/*.parquet` |
+| **Bronze** | Preservar o que chegou, rastreável e **versionado** | `data/bronze/` — tabelas **Delta Lake** |
 | **Silver** | Limpar, tipar, padronizar, integrar | modelos `stg_*` (dbt) |
-| **Gold** | Organizar para uma necessidade de consumo | `fato_chamado` + dimensões (dbt) |
+| **Gold** | Organizar para uma necessidade de consumo | `fato_taxa` + dimensões (dbt) |
 | **Serving** | Disponibilizar para consulta | DuckDB (`data/analytics.duckdb`) |
 | **Consumo** | Transformar dado em informação útil | SQL / indicadores |
 
@@ -57,12 +57,12 @@ Found 8 models, 20 data tests, 4 sources, 472 macros
 
 O resultado desta etapa é o **`target/manifest.json`** — um inventário completo do projeto: cada modelo, suas colunas, seus testes e, principalmente, **de quem ele depende**.
 
-**2. Compile.** As expressões `{{ }}` (Jinja) são substituídas. O `{{ ref('stg_unidades') }}` que você escreveu vira o endereço real da tabela. O SQL resultante fica em **`target/compiled/`** — é lá que você olha quando quer entender o que o dbt realmente entendeu do seu código.
+**2. Compile.** As expressões `{{ }}` (Jinja) são substituídas. O `{{ ref('stg_ufs') }}` que você escreveu vira o endereço real da tabela. O SQL resultante fica em **`target/compiled/`** — é lá que você olha quando quer entender o que o dbt realmente entendeu do seu código.
 
 **3. DAG.** A partir dos `ref()` e `source()` coletados no parse, o dbt monta o grafo de dependências. É informação que já está no manifest:
 
 ```text
-depends_on de dim_unidade: ['model.central_servicos.stg_unidades']
+depends_on de dim_uf: ['model.central_servicos.stg_ufs']
 ```
 
 **4. Ordena.** Com o grafo em mãos, o dbt calcula a ordem de execução (ordem topológica). Por isso a Silver é construída antes da Gold **sem que ninguém escreva essa ordem em lugar nenhum**. Se houvesse mais de uma *thread* configurada, ele também paralelizaria os modelos independentes.
@@ -95,19 +95,16 @@ Repare que `dbt test` percorre as mesmas cinco etapas — só que, em vez de cri
 ## A DAG que o dbt enxerga
 
 ```text
-bronze.chamados ────> stg_chamados ─────> fato_chamado ──┐
-                                     └──> dim_tempo ─────┤
-bronze.unidades ────> stg_unidades ──┬──> dim_unidade ───┼──> consulta analítica
-                                     └──> fato_chamado   │
-bronze.categorias ──> stg_categorias ───> dim_categoria ─┘
-
-bronze.interacoes ──> stg_interacoes        (grão de EVENTO: fica fora da fato)
+bronze.taxas ──> stg_taxas ──┬──> fato_taxa ──┐
+(Delta)                      │                │──> consulta analítica
+bronze.ufs   ──> stg_ufs   ──┴──> dim_uf   ───┘
+(Delta)                           └──> fato_taxa
 ```
 
 **Repare em duas coisas contraintuitivas.**
 
-A `fato_chamado` **não referencia as dimensões** — ela depende de `stg_chamados` e `stg_unidades`, e só. O encontro entre fato e dimensão acontece na hora da **consulta**, não na construção. Estrela é modelo lógico; DAG é ordem de construção.
+A `fato_taxa` **não referencia a dimensão** — ela depende de `stg_taxas` e `stg_ufs`, e só. O encontro entre fato e dimensão acontece na hora da **consulta**, não na construção. Estrela é modelo lógico; DAG é ordem de construção.
 
-E a `dim_tempo` depende de `stg_chamados` — não porque a fato precise dela, mas porque ela usa a menor e a maior data para saber que intervalo de calendário gerar.
+E a `dim_uf` depende de `stg_ufs` — o cadastro de UF → região que dá o contexto geográfico à fato.
 
 `source()` marca onde o dado ENTRA no domínio dbt; `ref()` declara dependência entre modelos. É isso que permite ao dbt construir na ordem certa, testar e desenhar o lineage (`dbt docs serve`).

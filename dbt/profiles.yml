@@ -8,3 +8,7 @@ central_servicos:
       type: duckdb
       path: ../data/analytics.duckdb
       threads: 1
+      # Extensão que permite ao DuckDB LER as tabelas Delta do Bronze
+      # (delta_scan). É baixada automaticamente no primeiro uso.
+      extensions:
+        - delta
